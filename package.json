@@ -5,7 +5,7 @@
   "scripts": {
     
     "gallery:generate": "node src/scripts/generate-gallery.js",
-    "build": "npm run gallery:generate && next build",
+    "build": "next build",
     "dev": "next dev",
     "start": "next start",
     "lint": "eslint"
