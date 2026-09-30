@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from "next/image";
@@ -48,12 +49,12 @@ export default function Restaurant() {
                 onClick={() => setSelectedMenu({ src: image, title })}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#07101D] text-left"
               >
-                <div className="relative aspect-[4/5]">
+                <div className="relative aspect-[4/5] w-full">
                   <Image
                     src={image}
                     alt={`${title} - The Checkpoint Bashundhara`}
                     fill
-                    sizes="(max-width: 640px) 100vw, 50vw"
+                    sizes="(max-width: 639px) 100vw, 50vw"
                     quality={70}
                     loading="lazy"
                     className="object-cover"
@@ -101,7 +102,7 @@ export default function Restaurant() {
           </button>
 
           <div
-            className="relative flex max-h-[94vh] w-full max-w-5xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#030712]"
+            className="relative flex max-h-[94dvh] w-full max-w-5xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#030712]"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -109,9 +110,16 @@ export default function Restaurant() {
               alt={selectedMenu.title}
               width={1200}
               height={1500}
-              sizes="(max-width: 640px) 94vw, 1200px"
+              sizes="94vw"
               quality={75}
-              className="block h-auto max-h-[94vh] w-auto max-w-full object-contain"
+              priority
+              className="block h-auto max-h-[94dvh] w-auto max-w-full object-contain"
+              style={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "100%",
+                maxHeight: "94dvh",
+              }}
             />
           </div>
         </div>
@@ -119,3 +127,4 @@ export default function Restaurant() {
     </section>
   );
 }
+

@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from "next/image";
@@ -17,6 +18,7 @@ export default function Packages() {
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:px-10">
         <div className="mb-12 flex items-center gap-3 sm:mb-16">
           <span className="h-px w-8 bg-blue-500" />
+
           <span className="text-xl font-black uppercase tracking-[0.2em] text-blue-400 sm:text-2xl">
             The Checkpoint Fitness
           </span>
@@ -35,7 +37,7 @@ export default function Packages() {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 900px"
             quality={75}
             loading="lazy"
-            className="mx-auto block max-h-[75vh] w-auto max-w-full object-contain sm:transition-transform sm:duration-500 sm:group-hover:scale-[1.015]"
+            className="mx-auto block h-auto w-full max-w-[1066px] object-contain sm:transition-transform sm:duration-500 sm:group-hover:scale-[1.015]"
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-[#030712]/70 to-transparent" />

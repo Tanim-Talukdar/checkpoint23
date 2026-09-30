@@ -1,3 +1,4 @@
+
 "use client";
 
 import { gaming } from "@/generated/gallery-data";
@@ -7,7 +8,9 @@ import { FiArrowUpRight, FiX } from "react-icons/fi";
 
 const menuImages = [
   {
-    src: gaming.images.find((image) => image.includes("/pricelist.webp")),
+    src: gaming.images.find((image) =>
+      image.includes("/pricelist.webp")
+    ),
     alt: "The Checkpoint gaming prices and session rates in Bashundhara Dhaka",
     label: "GAME PRICING",
   },
@@ -17,7 +20,9 @@ const menuImages = [
     label: "PS5 GAME LIST",
   },
   {
-    src: gaming.images.find((image) => image.includes("/othergaming.webp")),
+    src: gaming.images.find((image) =>
+      image.includes("/othergaming.webp")
+    ),
     alt: "The Checkpoint other gaming games list",
     label: "OTHER GAMES",
   },
@@ -121,7 +126,7 @@ export default function Gaming() {
 
           {/* IMAGE CONTAINER */}
           <div
-            className="relative max-h-[94vh] max-w-6xl overflow-auto rounded-xl border border-white/10 bg-[#07101D]"
+            className="relative flex max-h-[94dvh] max-w-6xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#07101D]"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -129,9 +134,16 @@ export default function Gaming() {
               alt={selectedImage.alt}
               width={1600}
               height={2000}
-              sizes="(max-width: 768px) 94vw, 1200px"
+              sizes="94vw"
               quality={75}
-              className="block h-auto max-h-[94vh] w-auto max-w-[94vw] object-contain"
+              priority
+              className="block h-auto w-auto max-h-[94dvh] max-w-[94vw] object-contain"
+              style={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "94vw",
+                maxHeight: "94dvh",
+              }}
             />
           </div>
         </div>
