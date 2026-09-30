@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from "next/image";
@@ -13,7 +12,7 @@ function optimizeCloudinaryUrl(url, width) {
 
   return url.replace(
     "/upload/",
-    `/upload/f_auto,q_auto:eco,w_${width}/`
+    `/upload/f_auto,q_auto,w_${width}/`
   );
 }
 
@@ -42,11 +41,10 @@ export default function Gallery() {
           <div className="space-y-16">
             {gallerySections.map((section) => (
               <div key={section.folder}>
-
                 <div className="space-y-12">
                   {section.routes.map((route) => (
                     <div key={route.folder}>
-                      <h4 className="text-xl font-black uppercase tracking-[0.1em] text-blue-400 sm:text-2xl pb-10">
+                      <h4 className="pb-10 text-xl font-black uppercase tracking-[0.1em] text-blue-400 sm:text-2xl">
                         {route.folder
                           .replace(/-/g, " ")
                           .replace(/\b\w/g, (char) => char.toUpperCase())}
@@ -56,7 +54,7 @@ export default function Gallery() {
                         {route.images.map((image, index) => {
                           const thumbnailSrc = optimizeCloudinaryUrl(
                             image,
-                            600
+                            480
                           );
 
                           const fullSrc = optimizeCloudinaryUrl(
@@ -74,7 +72,7 @@ export default function Gallery() {
                                   title: route.folder,
                                 })
                               }
-                              className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-white/10 bg-[#080f1c] sm:rounded-xl"
+                              className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-white/10 bg-[#080f1c] focus:outline-none focus:ring-2 focus:ring-blue-500/60 sm:rounded-xl"
                             >
                               <Image
                                 src={thumbnailSrc}
@@ -82,12 +80,13 @@ export default function Gallery() {
                                 fill
                                 sizes="(max-width: 640px) 33vw, (max-width: 1024px) 30vw, 400px"
                                 loading="lazy"
+                                quality={70}
                                 className="object-cover"
                               />
 
-                              <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/25" />
+                              <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-200 sm:group-hover:bg-black/25" />
 
-                              <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                              <div className="pointer-events-none absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded-full bg-black/50 sm:flex sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100">
                                 <FiMaximize2
                                   size={13}
                                   className="text-white"
@@ -122,7 +121,7 @@ export default function Gallery() {
           </button>
 
           <div
-            className="relative flex max-h-[90vh] w-full max-w-6xl items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#080f1c]"
+            className="relative flex max-h-[90vh] w-full max-w-6xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#080f1c]"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -130,10 +129,9 @@ export default function Gallery() {
               alt={selectedImage.title}
               width={1600}
               height={1200}
-              sizes="94vw"
+              sizes="(max-width: 640px) 94vw, 1200px"
               quality={75}
-              priority
-              className="max-h-[90vh] w-auto max-w-full object-contain"
+              className="block h-auto max-h-[90vh] w-auto max-w-[94vw] object-contain"
             />
           </div>
         </div>

@@ -16,8 +16,8 @@ export default function Restaurant() {
       className="relative overflow-hidden bg-[#030712] text-white"
     >
       {/* Background glow */}
-      <div className="pointer-events-none absolute -right-40 top-20 h-[450px] w-[450px] rounded-full bg-blue-600/[0.08] blur-[140px]" />
-      <div className="pointer-events-none absolute -left-40 bottom-20 h-[400px] w-[400px] rounded-full bg-cyan-500/[0.04] blur-[120px]" />
+      <div className="pointer-events-none absolute -right-40 top-20 hidden h-[450px] w-[450px] rounded-full bg-blue-600/[0.08] blur-[140px] sm:block" />
+      <div className="pointer-events-none absolute -left-40 bottom-20 hidden h-[400px] w-[400px] rounded-full bg-cyan-500/[0.04] blur-[120px] sm:block" />
 
       <div className="h-px bg-blue-500/25" />
 
@@ -45,12 +45,7 @@ export default function Restaurant() {
               <button
                 key={image}
                 type="button"
-                onClick={() =>
-                  setSelectedMenu({
-                    src: image,
-                    title,
-                  })
-                }
+                onClick={() => setSelectedMenu({ src: image, title })}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#07101D] text-left"
               >
                 <div className="relative aspect-[4/5]">
@@ -66,7 +61,7 @@ export default function Restaurant() {
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
 
-                  <div className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white group-hover:border-blue-400 group-hover:bg-blue-600">
+                  <div className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition sm:group-hover:border-blue-400 sm:group-hover:bg-blue-600">
                     <FiArrowUpRight size={17} />
                   </div>
 
@@ -100,13 +95,13 @@ export default function Restaurant() {
             type="button"
             onClick={() => setSelectedMenu(null)}
             aria-label="Close menu"
-            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/80 text-white sm:right-4 sm:top-4"
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/80 text-white transition hover:bg-blue-600 sm:right-4 sm:top-4"
           >
             <FiX size={20} />
           </button>
 
           <div
-            className="relative flex max-h-[94vh] w-full max-w-5xl items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#030712]"
+            className="relative flex max-h-[94vh] w-full max-w-5xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#030712]"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -114,10 +109,9 @@ export default function Restaurant() {
               alt={selectedMenu.title}
               width={1200}
               height={1500}
-              sizes="94vw"
+              sizes="(max-width: 640px) 94vw, 1200px"
               quality={75}
-              priority
-              className="max-h-[94vh] w-auto max-w-full object-contain"
+              className="block h-auto max-h-[94vh] w-auto max-w-full object-contain"
             />
           </div>
         </div>

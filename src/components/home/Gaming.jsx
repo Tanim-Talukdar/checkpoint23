@@ -121,21 +121,18 @@ export default function Gaming() {
 
           {/* IMAGE CONTAINER */}
           <div
-            className="relative max-h-[94vh] max-w-6xl overflow-hidden rounded-xl border border-white/10 bg-[#07101D]"
+            className="relative max-h-[94vh] max-w-6xl overflow-auto rounded-xl border border-white/10 bg-[#07101D]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="max-h-[94vh] overflow-auto">
-              <Image
-                src={selectedImage.src}
-                alt={selectedImage.alt}
-                width={1600}
-                height={2000}
-                sizes="(max-width: 768px) 94vw, 1200px"
-                quality={75}
-                priority
-                className="block h-auto max-h-[94vh] w-auto max-w-[94vw] object-contain"
-              />
-            </div>
+            <Image
+              src={selectedImage.src}
+              alt={selectedImage.alt}
+              width={1600}
+              height={2000}
+              sizes="(max-width: 768px) 94vw, 1200px"
+              quality={75}
+              className="block h-auto max-h-[94vh] w-auto max-w-[94vw] object-contain"
+            />
           </div>
         </div>
       )}

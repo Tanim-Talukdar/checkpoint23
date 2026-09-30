@@ -1,9 +1,11 @@
-
 "use client";
 
 import Image from "next/image";
 import { useState } from "react";
 import { FiArrowUpRight, FiX } from "react-icons/fi";
+
+const PACKAGE_IMAGE =
+  "https://res.cloudinary.com/qds5td8c/image/upload/f_auto,q_auto,w_1066/the-checkpoint/packeges.webp";
 
 export default function Packages() {
   const [showPackage, setShowPackage] = useState(false);
@@ -13,7 +15,6 @@ export default function Packages() {
       <div className="h-px bg-blue-500/25" />
 
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:px-10">
-        {/* TITLE */}
         <div className="mb-12 flex items-center gap-3 sm:mb-16">
           <span className="h-px w-8 bg-blue-500" />
           <span className="text-xl font-black uppercase tracking-[0.2em] text-blue-400 sm:text-2xl">
@@ -21,20 +22,20 @@ export default function Packages() {
           </span>
         </div>
 
-        {/* PACKAGE IMAGE */}
         <button
           type="button"
           onClick={() => setShowPackage(true)}
           className="group relative mx-auto block max-w-full overflow-hidden rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl"
         >
           <Image
-            src="https://res.cloudinary.com/qds5td8c/image/upload/v1790704843/the-checkpoint/packeges.webp"
+            src={PACKAGE_IMAGE}
             alt="The Checkpoint fitness packages and membership pricing"
             width={1066}
             height={1419}
-            sizes="(max-width: 768px) 100vw, 900px"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 900px"
+            quality={75}
             loading="lazy"
-            className="mx-auto block max-h-[75vh] w-auto max-w-full object-contain transition-transform duration-500 group-hover:scale-[1.015]"
+            className="mx-auto block max-h-[75vh] w-auto max-w-full object-contain sm:transition-transform sm:duration-500 sm:group-hover:scale-[1.015]"
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-[#030712]/70 to-transparent" />
@@ -53,23 +54,22 @@ export default function Packages() {
             </p>
           </div>
 
-          <div className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition duration-300 group-hover:border-blue-400 group-hover:bg-blue-600">
+          <div className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition sm:group-hover:border-blue-400 sm:group-hover:bg-blue-600">
             <FiArrowUpRight size={18} />
           </div>
         </button>
       </div>
 
-      {/* MODAL */}
       {showPackage && (
         <div
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-3 backdrop-blur-md sm:p-6"
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-3 sm:p-6"
           onClick={() => setShowPackage(false)}
         >
           <button
             type="button"
             onClick={() => setShowPackage(false)}
             aria-label="Close package"
-            className="absolute right-4 top-4 z-[1000] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white backdrop-blur-md transition hover:bg-blue-600"
+            className="absolute right-4 top-4 z-[1000] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white transition hover:bg-blue-600"
           >
             <FiX size={20} />
           </button>
@@ -79,12 +79,13 @@ export default function Packages() {
             onClick={(e) => e.stopPropagation()}
           >
             <Image
-              src="/packeges.webp"
+              src={PACKAGE_IMAGE}
               alt="The Checkpoint fitness packages"
               width={1066}
               height={1419}
-              sizes="(max-width: 768px) 90vw, 896px"
-              className="block max-h-[82vh] max-w-[90vw] object-contain sm:max-w-4xl"
+              sizes="90vw"
+              quality={80}
+              className="block h-auto max-h-[82vh] w-auto max-w-full object-contain"
             />
           </div>
         </div>
