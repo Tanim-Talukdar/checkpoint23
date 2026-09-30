@@ -10,6 +10,7 @@ import {
   FiActivity,
   FiMonitor,
   FiCoffee,
+  FiMapPin,
   FiGrid
 } from "react-icons/fi";
 
@@ -30,14 +31,14 @@ const links = [
     icon: FiCoffee,
   },
   {
-    name: "gallery",
+    name: "Gallery",
     href: "/#gallery",
     icon:  FiGrid,
   },
   {
-    name: "contact",
+    name: "Contact",
     href: "/#contact",
-    icon:  FiGrid,
+    icon:  FiMapPin,
   },
   {
     name: "Movie",

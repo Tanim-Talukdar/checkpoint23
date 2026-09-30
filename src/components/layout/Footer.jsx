@@ -13,7 +13,6 @@ import Image from "next/image";
 import LocationMap from "../LocationMap";
 
 const navigation = [
-  { name: "Home", href: "/#home" },
   { name: "Gaming", href: "/#gaming" },
   { name: "Restaurant", href: "/#restaurant" },
   { name: "Fitness", href: "/#packages" },
