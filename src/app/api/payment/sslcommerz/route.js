@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import mongoose from "mongoose";
 
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/booking";
@@ -10,54 +11,56 @@ const paymentSchema = z.object({
   bookingId: z.string().min(1, "Booking ID is required"),
 });
 
+const getSslCommerzUrl = () =>
+  process.env.SSLCOMMERZ_IS_LIVE === "true"
+    ? "https://securepay.sslcommerz.com/gwprocess/v4/api.php"
+    : "https://sandbox.sslcommerz.com/gwprocess/v4/api.php";
+
 export async function POST(request) {
   try {
-    // --------------------------------------------------
-    // 1. Validate request body
-    // --------------------------------------------------
+    // Validate request
+    let body;
 
-    const body = await request.json();
-
-    const parsed = paymentSchema.safeParse(body);
-
-    if (!parsed.success) {
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid booking ID",
-        },
+        { success: false, message: "Invalid request body" },
         { status: 400 }
       );
     }
 
-    const { bookingId } = parsed.data;
+    const validation = paymentSchema.safeParse(body);
 
-    // --------------------------------------------------
-    // 2. Connect to MongoDB
-    // --------------------------------------------------
+    if (!validation.success) {
+      return NextResponse.json(
+        { success: false, message: "Invalid booking ID" },
+        { status: 400 }
+      );
+    }
+
+    const { bookingId } = validation.data;
+
+    if (!mongoose.isValidObjectId(bookingId)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid booking ID" },
+        { status: 400 }
+      );
+    }
 
     await connectDB();
 
-    // --------------------------------------------------
-    // 3. Find booking
-    // --------------------------------------------------
-
+    // Find booking
     const booking = await Booking.findById(bookingId);
 
     if (!booking) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Booking not found",
-        },
+        { success: false, message: "Booking not found" },
         { status: 404 }
       );
     }
 
-    // --------------------------------------------------
-    // 4. Check booking status
-    // --------------------------------------------------
-
+    // Validate booking state
     if (
       booking.paymentStatus !== "pending" ||
       booking.bookingStatus !== "pending"
@@ -71,30 +74,22 @@ export async function POST(request) {
       );
     }
 
-    // --------------------------------------------------
-    // 5. Check booking expiration
-    // --------------------------------------------------
-
     if (
       !booking.expiresAt ||
       new Date(booking.expiresAt).getTime() <= Date.now()
     ) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Booking has expired",
-        },
+        { success: false, message: "Booking has expired" },
         { status: 400 }
       );
     }
 
-    // --------------------------------------------------
-    // 6. Check environment variables
-    // --------------------------------------------------
-
-    const storeId = process.env.SSLCOMMERZ_STORE_ID;
-    const storePassword = process.env.SSLCOMMERZ_STORE_PASSWORD;
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    // Environment
+    const {
+      SSLCOMMERZ_STORE_ID: storeId,
+      SSLCOMMERZ_STORE_PASSWORD: storePassword,
+      NEXT_PUBLIC_BASE_URL: baseUrl,
+    } = process.env;
 
     if (!storeId || !storePassword) {
       console.error("SSLCOMMERZ credentials are missing");
@@ -120,53 +115,40 @@ export async function POST(request) {
       );
     }
 
-    // --------------------------------------------------
-    // 7. Generate unique transaction ID
-    // --------------------------------------------------
+    // Reuse existing transaction ID
+    const tranId =
+      booking.payment?.tranId ||
+      `B${Date.now()}${Math.floor(Math.random() * 1000000)}`;
 
-    const tranId = `B${Date.now()}${Math.floor(
-      Math.random() * 1000000
-    )}`;
+    if (booking.payment?.tranId !== tranId) {
+      booking.payment = {
+        ...(booking.payment || {}),
+        tranId,
+      };
 
-    // --------------------------------------------------
-    // 8. Save transaction ID
-    // --------------------------------------------------
-
-    booking.payment = booking.payment || {};
-    booking.payment.tranId = tranId;
-
-    await booking.save();
-
-    // --------------------------------------------------
-    // 9. SSLCOMMERZ API data
-    // --------------------------------------------------
+      await booking.save();
+    }
 
     const paymentData = {
       store_id: storeId,
       store_passwd: storePassword,
-
       total_amount: String(booking.totalAmount),
       currency: "BDT",
       tran_id: tranId,
 
-      // Movie ID
       value_a: booking.movieId.toString(),
 
-      // Callback URLs
       success_url: `${baseUrl}/api/payment/sslcommerz/success`,
       fail_url: `${baseUrl}/api/payment/sslcommerz/fail`,
       cancel_url: `${baseUrl}/api/payment/sslcommerz/cancel`,
       ipn_url: `${baseUrl}/api/payment/sslcommerz/ipn`,
 
-      // Shipping
       shipping_method: "NO",
 
-      // Product
       product_name: "Movie Ticket",
       product_category: "Movie",
       product_profile: "non-physical-goods",
 
-      // Customer
       cus_name: booking.customer.name,
       cus_email: booking.customer.email,
       cus_phone: booking.customer.phone,
@@ -176,34 +158,12 @@ export async function POST(request) {
       cus_postcode: "1000",
       cus_country: "Bangladesh",
 
-      // Shipping information
       ship_name: booking.customer.name,
       ship_add1: "N/A",
       ship_city: "Dhaka",
       ship_postcode: "1000",
       ship_country: "Bangladesh",
     };
-
-    // --------------------------------------------------
-    // 10. Select Sandbox / Live endpoint
-    // --------------------------------------------------
-
-    const isLive = process.env.SSLCOMMERZ_IS_LIVE === "true";
-
-    const sslcommerzUrl = isLive
-      ? "https://securepay.sslcommerz.com/gwprocess/v4/api.php"
-      : "https://sandbox.sslcommerz.com/gwprocess/v4/api.php";
-
-    console.log("Initializing SSLCOMMERZ payment:", {
-      tranId,
-      amount: booking.totalAmount,
-      mode: isLive ? "LIVE" : "SANDBOX",
-      baseUrl,
-    });
-
-    // --------------------------------------------------
-    // 11. Convert data to application/x-www-form-urlencoded
-    // --------------------------------------------------
 
     const formData = new URLSearchParams();
 
@@ -213,31 +173,22 @@ export async function POST(request) {
       }
     });
 
-    // --------------------------------------------------
-    // 12. Call SSLCOMMERZ directly
-    // --------------------------------------------------
-
-    const response = await fetch(sslcommerzUrl, {
+    // Initialize SSLCOMMERZ
+    const response = await fetch(getSslCommerzUrl(), {
       method: "POST",
-
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-
-      body: formData.toString(),
+      body: formData,
+      cache: "no-store",
     });
 
-    // --------------------------------------------------
-    // 13. Check HTTP response
-    // --------------------------------------------------
+    const responseText = await response.text();
 
     if (!response.ok) {
-      const errorText = await response.text();
-
       console.error("SSLCOMMERZ HTTP error:", {
         status: response.status,
         statusText: response.statusText,
-        response: errorText,
       });
 
       return NextResponse.json(
@@ -249,31 +200,33 @@ export async function POST(request) {
       );
     }
 
-    // --------------------------------------------------
-    // 14. Parse SSLCOMMERZ response
-    // --------------------------------------------------
+    let apiResponse;
 
-    const apiResponse = await response.json();
+    try {
+      apiResponse = JSON.parse(responseText);
+    } catch {
+      console.error("Invalid SSLCOMMERZ response:", {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+      });
 
-    console.log("SSLCOMMERZ response:", {
-      status: apiResponse?.status,
-      sessionkey: apiResponse?.sessionkey,
-      GatewayPageURL: apiResponse?.GatewayPageURL,
-    });
-
-    // --------------------------------------------------
-    // 15. Check gateway URL
-    // --------------------------------------------------
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid response from SSLCOMMERZ",
+        },
+        { status: 502 }
+      );
+    }
 
     if (
-      !apiResponse ||
-      apiResponse.status !== "SUCCESS" ||
-      !apiResponse.GatewayPageURL
+      apiResponse?.status !== "SUCCESS" ||
+      !apiResponse?.GatewayPageURL
     ) {
-      console.error(
-        "SSLCOMMERZ initialization failed:",
-        apiResponse
-      );
+      console.error("SSLCOMMERZ initialization failed:", {
+        status: apiResponse?.status,
+        failedreason: apiResponse?.failedreason,
+      });
 
       return NextResponse.json(
         {
@@ -282,13 +235,9 @@ export async function POST(request) {
             apiResponse?.failedreason ||
             "Failed to initialize SSLCOMMERZ payment",
         },
-        { status: 500 }
+        { status: 502 }
       );
     }
-
-    // --------------------------------------------------
-    // 16. Return payment URL
-    // --------------------------------------------------
 
     return NextResponse.json({
       success: true,

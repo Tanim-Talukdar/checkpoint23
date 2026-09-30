@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +7,6 @@ import {
   FiSearch,
   FiEdit2,
   FiTrash2,
-  FiMoreVertical,
   FiFilm,
   FiClock,
   FiStar,
@@ -16,74 +14,95 @@ import {
   FiX,
 } from "react-icons/fi";
 
+const formatDuration = (minutes) => {
+  if (!minutes) return "—";
+
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+
+  if (!hours) return `${mins}m`;
+  if (!mins) return `${hours}h`;
+
+  return `${hours}h ${mins}m`;
+};
+
 export default function MoviesPage() {
   const [movies, setMovies] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Custom delete modal
   const [deleteMovie, setDeleteMovie] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const fetchMovies = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch("/api/movies", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to fetch movies");
+        }
+
+        if (!cancelled) {
+          setMovies(data.movies || []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error);
+          setError(error.message || "Failed to load movies");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchMovies();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchMovies = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const { filteredMovies, ratedCount, releaseDateCount } = useMemo(() => {
+    const value = search.trim().toLowerCase();
 
-      const response = await fetch("/api/movies", {
-        cache: "no-store",
-      });
+    let rated = 0;
+    let releaseDates = 0;
 
-      const data = await response.json();
+    const filtered = movies.filter((movie) => {
+      if (movie.rating > 0) rated++;
+      if (movie.releaseDate?.trim()) releaseDates++;
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to fetch movies");
-      }
+      if (!value) return true;
 
-      setMovies(data.movies || []);
-    } catch (error) {
-      console.error(error);
-      setError(error.message || "Failed to load movies");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredMovies = useMemo(() => {
-    const value = search.toLowerCase().trim();
-
-    if (!value) return movies;
-
-    return movies.filter((movie) => {
       const title = movie.title?.toLowerCase() || "";
-
       const genres = Array.isArray(movie.genres)
         ? movie.genres.join(" ").toLowerCase()
         : "";
 
       return title.includes(value) || genres.includes(value);
     });
+
+    return {
+      filteredMovies: filtered,
+      ratedCount: rated,
+      releaseDateCount: releaseDates,
+    };
   }, [movies, search]);
 
-  const formatDuration = (minutes) => {
-    if (!minutes) return "—";
-
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-
-    return `${hours}h ${mins}m`;
-  };
-
   const handleDelete = async () => {
-    if (!deleteMovie) return;
+    if (!deleteMovie || deleting) return;
 
     try {
       setDeleting(true);
@@ -99,24 +118,19 @@ export default function MoviesPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || "Failed to delete movie"
-        );
+        throw new Error(data.message || "Failed to delete movie");
       }
 
-      setMovies((currentMovies) =>
-        currentMovies.filter(
-          (movie) => movie._id !== deleteMovie._id
-        )
+      const deletedId = deleteMovie._id;
+
+      setMovies((current) =>
+        current.filter((movie) => movie._id !== deletedId)
       );
 
       setDeleteMovie(null);
     } catch (error) {
       console.error(error);
-
-      setError(
-        error.message || "Failed to delete movie"
-      );
+      setError(error.message || "Failed to delete movie");
     } finally {
       setDeleting(false);
     }
@@ -124,24 +138,16 @@ export default function MoviesPage() {
 
   return (
     <div className="min-h-screen bg-[#050A14] text-white">
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
-
+      {/* HEADER */}
       <div className="border-b border-white/[0.07] bg-[#07101c]/60">
         <div className="px-5 py-6 sm:px-8 lg:px-10">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm text-slate-500">
                 <FiFilm />
-
                 <span>Administration</span>
-
                 <span>/</span>
-
-                <span className="text-slate-400">
-                  Movies
-                </span>
+                <span className="text-slate-400">Movies</span>
               </div>
 
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -158,23 +164,15 @@ export default function MoviesPage() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-medium transition hover:bg-blue-500"
             >
               <FiPlus size={18} />
-
               Add Movie
             </Link>
           </div>
         </div>
       </div>
 
-      {/* =====================================================
-          CONTENT
-      ====================================================== */}
-
+      {/* CONTENT */}
       <div className="px-5 py-6 sm:px-8 lg:px-10">
-        {/* Search + Stats */}
-
         <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_auto_auto_auto]">
-          {/* Search */}
-
           <div className="relative">
             <FiSearch
               size={18}
@@ -199,40 +197,30 @@ export default function MoviesPage() {
           <Stat
             icon={<FiStar />}
             label="Rated"
-            value={
-              movies.filter(
-                (movie) => movie.rating > 0
-              ).length
-            }
+            value={ratedCount}
           />
 
           <Stat
             icon={<FiCalendar />}
             label="With Release Date"
-            value={
-              movies.filter(
-                (movie) => movie.releaseDate?.trim()
-              ).length
-            }
+            value={releaseDateCount}
           />
         </div>
-
-        {/* Error */}
 
         {error && (
           <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
             <span>{error}</span>
 
             <button
+              type="button"
               onClick={() => setError("")}
               className="text-red-400 transition hover:text-red-300"
+              aria-label="Close error"
             >
               <FiX />
             </button>
           </div>
         )}
-
-        {/* Loading */}
 
         {loading ? (
           <LoadingState />
@@ -240,10 +228,7 @@ export default function MoviesPage() {
           <EmptyState search={search} />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07101c]/70">
-            {/* =================================================
-                DESKTOP TABLE
-            ================================================== */}
-
+            {/* DESKTOP */}
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full">
                 <thead>
@@ -279,29 +264,20 @@ export default function MoviesPage() {
                     <MovieRow
                       key={movie._id}
                       movie={movie}
-                      formatDuration={formatDuration}
-                      onDelete={() =>
-                        setDeleteMovie(movie)
-                      }
+                      onDelete={() => setDeleteMovie(movie)}
                     />
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* =================================================
-                MOBILE
-            ================================================== */}
-
+            {/* MOBILE */}
             <div className="divide-y divide-white/[0.07] md:hidden">
               {filteredMovies.map((movie) => (
                 <MovieMobileCard
                   key={movie._id}
                   movie={movie}
-                  formatDuration={formatDuration}
-                  onDelete={() =>
-                    setDeleteMovie(movie)
-                  }
+                  onDelete={() => setDeleteMovie(movie)}
                 />
               ))}
             </div>
@@ -309,10 +285,7 @@ export default function MoviesPage() {
         )}
       </div>
 
-      {/* =====================================================
-          DELETE MODAL
-      ====================================================== */}
-
+      {/* DELETE MODAL */}
       {deleteMovie && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
@@ -323,8 +296,6 @@ export default function MoviesPage() {
           }}
         >
           <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07101c] shadow-2xl">
-            {/* Modal Header */}
-
             <div className="flex items-start gap-4 p-6">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
                 <FiTrash2 size={20} />
@@ -353,12 +324,11 @@ export default function MoviesPage() {
                 disabled={deleting}
                 onClick={() => setDeleteMovie(null)}
                 className="text-slate-500 transition hover:text-white disabled:opacity-50"
+                aria-label="Close delete dialog"
               >
                 <FiX size={19} />
               </button>
             </div>
-
-            {/* Modal Footer */}
 
             <div className="flex justify-end gap-3 border-t border-white/[0.07] bg-white/[0.015] px-6 py-4">
               <button
@@ -379,13 +349,11 @@ export default function MoviesPage() {
                 {deleting ? (
                   <>
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-
                     Deleting...
                   </>
                 ) : (
                   <>
                     <FiTrash2 size={15} />
-
                     Delete
                   </>
                 )}
@@ -398,10 +366,6 @@ export default function MoviesPage() {
   );
 }
 
-/* =========================================================
-   STAT
-========================================================= */
-
 function Stat({ icon, label, value }) {
   return (
     <div className="flex min-w-[150px] items-center gap-3 rounded-xl border border-white/[0.08] bg-[#07101c] px-4 py-3">
@@ -410,27 +374,14 @@ function Stat({ icon, label, value }) {
       </div>
 
       <div>
-        <p className="text-[11px] text-slate-500">
-          {label}
-        </p>
-
-        <p className="text-lg font-semibold">
-          {value}
-        </p>
+        <p className="text-[11px] text-slate-500">{label}</p>
+        <p className="text-lg font-semibold">{value}</p>
       </div>
     </div>
   );
 }
 
-/* =========================================================
-   DESKTOP ROW
-========================================================= */
-
-function MovieRow({
-  movie,
-  formatDuration,
-  onDelete,
-}) {
+function MovieRow({ movie, onDelete }) {
   return (
     <tr className="border-b border-white/[0.05] transition hover:bg-white/[0.02]">
       <td className="px-6 py-4">
@@ -466,20 +417,16 @@ function MovieRow({
       <td className="px-6 py-4">
         <div className="flex max-w-[220px] flex-wrap gap-1.5">
           {movie.genres?.length ? (
-            movie.genres
-              .slice(0, 3)
-              .map((genre) => (
-                <span
-                  key={genre}
-                  className="rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-xs text-slate-400"
-                >
-                  {genre}
-                </span>
-              ))
+            movie.genres.slice(0, 3).map((genre) => (
+              <span
+                key={genre}
+                className="rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-xs text-slate-400"
+              >
+                {genre}
+              </span>
+            ))
           ) : (
-            <span className="text-sm text-slate-600">
-              —
-            </span>
+            <span className="text-sm text-slate-600">—</span>
           )}
         </div>
       </td>
@@ -487,23 +434,15 @@ function MovieRow({
       <td className="px-6 py-4">
         <div className="flex items-center gap-2 text-sm text-slate-400">
           <FiClock size={14} />
-
           {formatDuration(movie.duration)}
         </div>
       </td>
 
       <td className="px-6 py-4">
         <div className="flex items-center gap-1.5 text-sm">
-          <FiStar
-            className="text-yellow-400"
-            size={14}
-          />
+          <FiStar className="text-yellow-400" size={14} />
 
-          <span>
-            {movie.rating > 0
-              ? movie.rating.toFixed(1)
-              : "—"}
-          </span>
+          {movie.rating > 0 ? movie.rating.toFixed(1) : "—"}
         </div>
       </td>
 
@@ -529,29 +468,13 @@ function MovieRow({
           >
             <FiTrash2 size={15} />
           </button>
-
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-slate-400 transition hover:bg-white/[0.05] hover:text-white"
-            title="More"
-          >
-            <FiMoreVertical size={16} />
-          </button>
         </div>
       </td>
     </tr>
   );
 }
 
-/* =========================================================
-   MOBILE CARD
-========================================================= */
-
-function MovieMobileCard({
-  movie,
-  formatDuration,
-  onDelete,
-}) {
+function MovieMobileCard({ movie, onDelete }) {
   return (
     <div className="p-4">
       <div className="flex gap-4">
@@ -572,40 +495,31 @@ function MovieMobileCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="font-medium">
-                {movie.title}
-              </h3>
+              <h3 className="font-medium">{movie.title}</h3>
 
               <p className="mt-1 text-xs text-slate-500">
-                {movie.director ||
-                  "No director added"}
+                {movie.director || "No director added"}
               </p>
             </div>
 
             <span className="flex items-center gap-1 text-xs text-slate-400">
               <FiStar className="text-yellow-400" />
-
-              {movie.rating > 0
-                ? movie.rating.toFixed(1)
-                : "—"}
+              {movie.rating > 0 ? movie.rating.toFixed(1) : "—"}
             </span>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {movie.genres
-              ?.slice(0, 2)
-              .map((genre) => (
-                <span
-                  key={genre}
-                  className="rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-slate-400"
-                >
-                  {genre}
-                </span>
-              ))}
+            {movie.genres?.slice(0, 2).map((genre) => (
+              <span
+                key={genre}
+                className="rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-slate-400"
+              >
+                {genre}
+              </span>
+            ))}
 
             <span className="flex items-center gap-1 text-[11px] text-slate-500">
               <FiClock />
-
               {formatDuration(movie.duration)}
             </span>
           </div>
@@ -618,7 +532,6 @@ function MovieMobileCard({
           className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/[0.08] py-2.5 text-xs text-slate-300 transition hover:bg-white/[0.04]"
         >
           <FiEdit2 />
-
           Edit
         </Link>
 
@@ -628,17 +541,12 @@ function MovieMobileCard({
           className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-500/10 py-2.5 text-xs text-red-400 transition hover:bg-red-500/10"
         >
           <FiTrash2 />
-
           Delete
         </button>
       </div>
     </div>
   );
 }
-
-/* =========================================================
-   LOADING
-========================================================= */
 
 function LoadingState() {
   return (
@@ -654,10 +562,6 @@ function LoadingState() {
   );
 }
 
-/* =========================================================
-   EMPTY
-========================================================= */
-
 function EmptyState({ search }) {
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-[#07101c]/70 px-6 py-16 text-center">
@@ -666,9 +570,7 @@ function EmptyState({ search }) {
       </div>
 
       <h2 className="mt-5 text-lg font-medium">
-        {search
-          ? "No movies found"
-          : "No movies yet"}
+        {search ? "No movies found" : "No movies yet"}
       </h2>
 
       <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
@@ -683,7 +585,6 @@ function EmptyState({ search }) {
           className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-medium transition hover:bg-blue-500"
         >
           <FiPlus />
-
           Add Movie
         </Link>
       )}

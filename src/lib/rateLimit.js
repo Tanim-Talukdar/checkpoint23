@@ -18,10 +18,6 @@ export function checkRateLimit(
   }
 
   if (record.count >= maxRequests) {
-    const retryAfter = Math.ceil(
-      (windowMs - (now - record.start)) / 1000
-    );
-
     return {
       allowed: false,
       response: Response.json(
@@ -32,7 +28,9 @@ export function checkRateLimit(
         {
           status: 429,
           headers: {
-            "Retry-After": String(retryAfter),
+            "Retry-After": String(
+              Math.ceil((windowMs - (now - record.start)) / 1000)
+            ),
           },
         }
       ),

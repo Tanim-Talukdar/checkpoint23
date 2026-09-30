@@ -3,304 +3,328 @@ import { z } from "zod";
 
 import { connectDB } from "@/lib/mongodb";
 import Booking from "@/models/booking";
+import ManualBooking from "@/models/ManualBooking";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 
-const paymentSchema = z.object({
-  bookingId: z.string().min(1, "Booking ID is required"),
+const querySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(5).max(50).default(10),
+  search: z.string().trim().max(100).default(""),
+
+  paymentStatus: z
+    .enum(["all", "pending", "paid", "failed", "cancelled"])
+    .default("all"),
+
+  bookingStatus: z
+    .enum(["all", "pending", "confirmed", "cancelled"])
+    .default("all"),
 });
 
-export async function POST(request) {
+function normalizeOnlineBooking(booking) {
+  return {
+    ...booking,
+    recordType: "online",
+
+    customer: {
+      name: booking.customer?.name || "",
+      email: booking.customer?.email || "",
+      phone: booking.customer?.phone || "",
+    },
+
+    movie: booking.movieSnapshot ||
+      booking.movieId || {
+        title: "",
+        poster: "",
+      },
+
+    showtime: booking.showtimeSnapshot ||
+      booking.showtimeId || {
+        date: "",
+        startTime: "",
+        ticketPrice: 0,
+      },
+
+    hall: booking.hallId || {
+      name: booking.hallName || "Hall 1",
+    },
+
+    seats: Array.isArray(booking.seats) ? booking.seats : [],
+
+    payment: {
+      ...(booking.payment || {}),
+      paymentMethod: booking.payment?.paymentMethod || "Online",
+    },
+
+    totalAmount: Number(booking.totalAmount || 0),
+    paymentStatus: booking.paymentStatus || "pending",
+    bookingStatus: booking.bookingStatus || "pending",
+  };
+}
+
+function normalizeManualBooking(booking) {
+  return {
+    ...booking,
+    recordType: "manual",
+
+    customer: {
+      name: booking.customerName || "",
+      email: booking.email || "",
+      phone: booking.phone || "",
+    },
+
+    movie: booking.movieSnapshot || {
+      title:
+        booking.manualMovieName ||
+        booking.movieName ||
+        "",
+      poster: "",
+    },
+
+    showtime: booking.showtimeSnapshot || {
+      date: booking.date || "",
+      startTime: booking.time || "",
+      ticketPrice: 0,
+    },
+
+    hall: {
+      name: booking.hallName || "Hall 1",
+    },
+
+    seats: Array.isArray(booking.seats) ? booking.seats : [],
+
+    payment: {
+      ...(booking.payment || {}),
+      paymentMethod: booking.paymentMethod || "Cash",
+    },
+
+    totalAmount: Number(
+      booking.totalAmount ??
+        booking.amount ??
+        0
+    ),
+
+    paymentStatus: booking.paymentStatus || "paid",
+    bookingStatus: booking.bookingStatus || "confirmed",
+  };
+}
+
+function matchesSearch(booking, search) {
+  if (!search) return true;
+
+  const movieTitle =
+    booking.movie?.title ||
+    booking.movieSnapshot?.title ||
+    booking.manualMovieName ||
+    booking.movieName ||
+    "";
+
+  const values = [
+    booking.bookingId,
+    booking._id,
+
+    booking.customer?.name,
+    booking.customer?.email,
+    booking.customer?.phone,
+
+    booking.customerName,
+    booking.email,
+    booking.phone,
+
+    movieTitle,
+
+    booking.payment?.tranId,
+    booking.payment?.bankTranId,
+    booking.payment?.valId,
+
+    booking.recordType,
+    booking.bookingType,
+  ];
+
+  const target = search.toLowerCase();
+
+  return values.some((value) =>
+    String(value || "")
+      .toLowerCase()
+      .includes(target)
+  );
+}
+
+function applyFilters(
+  records,
+  { search, paymentStatus, bookingStatus }
+) {
+  return records.filter((booking) => {
+    if (
+      paymentStatus !== "all" &&
+      booking.paymentStatus !== paymentStatus
+    ) {
+      return false;
+    }
+
+    if (
+      bookingStatus !== "all" &&
+      booking.bookingStatus !== bookingStatus
+    ) {
+      return false;
+    }
+
+    return matchesSearch(booking, search);
+  });
+}
+
+function calculateStats(records) {
+  const stats = {
+    totalBookings: records.length,
+    paidCount: 0,
+    pendingCount: 0,
+    failedCount: 0,
+    cancelledCount: 0,
+    totalRevenue: 0,
+  };
+
+  for (const booking of records) {
+    switch (booking.paymentStatus) {
+      case "paid":
+        stats.paidCount++;
+
+        if (booking.bookingStatus === "confirmed") {
+          stats.totalRevenue += Number(
+            booking.totalAmount || 0
+          );
+        }
+        break;
+
+      case "pending":
+        stats.pendingCount++;
+        break;
+
+      case "failed":
+        stats.failedCount++;
+        break;
+
+      case "cancelled":
+        stats.cancelledCount++;
+        break;
+    }
+  }
+
+  return stats;
+}
+
+async function getAllPaymentRecords() {
+  const [onlineBookings, manualBookings] = await Promise.all([
+    Booking.find({})
+      .populate(
+        "movieId",
+        "title poster backdrop duration rating"
+      )
+      .populate(
+        "showtimeId",
+        "date startTime ticketPrice"
+      )
+      .populate(
+        "hallId",
+        "name capacity rows seatsPerRow seats"
+      )
+      .lean(),
+
+    ManualBooking.find({}).lean(),
+  ]);
+
+  return [...onlineBookings.map(normalizeOnlineBooking), ...manualBookings.map(normalizeManualBooking)]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt || 0) -
+        new Date(a.createdAt || 0)
+    );
+}
+
+export async function GET(request) {
   try {
-    // --------------------------------------------------
-    // 1. Validate request body
-    // --------------------------------------------------
+    const auth = await requireAdmin();
 
-    const body = await request.json();
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        { status: 401 }
+      );
+    }
 
-    const parsed = paymentSchema.safeParse(body);
+    const { searchParams } = new URL(request.url);
+
+    const parsed = querySchema.safeParse({
+      page: searchParams.get("page") || 1,
+      limit: searchParams.get("limit") || 10,
+      search: searchParams.get("search") || "",
+      paymentStatus:
+        searchParams.get("paymentStatus") || "all",
+      bookingStatus:
+        searchParams.get("bookingStatus") || "all",
+    });
 
     if (!parsed.success) {
       return NextResponse.json(
         {
           success: false,
-          message: "Invalid booking ID",
+          message: "Invalid query parameters",
+          errors: parsed.error.flatten(),
         },
         { status: 400 }
       );
     }
-
-    const { bookingId } = parsed.data;
-
-    // --------------------------------------------------
-    // 2. Connect to MongoDB
-    // --------------------------------------------------
 
     await connectDB();
 
-    // --------------------------------------------------
-    // 3. Find booking
-    // --------------------------------------------------
+    const {
+      page,
+      limit,
+      search,
+      paymentStatus,
+      bookingStatus,
+    } = parsed.data;
 
-    const booking = await Booking.findById(bookingId);
+    const records = await getAllPaymentRecords();
 
-    if (!booking) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Booking not found",
-        },
-        { status: 404 }
-      );
-    }
-
-    // --------------------------------------------------
-    // 4. Check booking status
-    // --------------------------------------------------
-
-    if (
-      booking.paymentStatus !== "pending" ||
-      booking.bookingStatus !== "pending"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Booking is not available for payment",
-        },
-        { status: 400 }
-      );
-    }
-
-    // --------------------------------------------------
-    // 5. Check booking expiration
-    // --------------------------------------------------
-
-    if (
-      !booking.expiresAt ||
-      new Date(booking.expiresAt).getTime() <= Date.now()
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Booking has expired",
-        },
-        { status: 400 }
-      );
-    }
-
-    // --------------------------------------------------
-    // 6. Check environment variables
-    // --------------------------------------------------
-
-    const storeId = process.env.SSLCOMMERZ_STORE_ID;
-    const storePassword = process.env.SSLCOMMERZ_STORE_PASSWORD;
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-
-    if (!storeId || !storePassword) {
-      console.error("SSLCOMMERZ credentials are missing");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "SSLCOMMERZ credentials are not configured",
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!baseUrl) {
-      console.error("NEXT_PUBLIC_BASE_URL is missing");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "NEXT_PUBLIC_BASE_URL is not configured",
-        },
-        { status: 500 }
-      );
-    }
-
-    // --------------------------------------------------
-    // 7. Generate unique transaction ID
-    // --------------------------------------------------
-
-    const tranId = `B${Date.now()}${Math.floor(
-      Math.random() * 1000000
-    )}`;
-
-    // --------------------------------------------------
-    // 8. Save transaction ID
-    // --------------------------------------------------
-
-    booking.payment = booking.payment || {};
-    booking.payment.tranId = tranId;
-
-    await booking.save();
-
-    // --------------------------------------------------
-    // 9. SSLCOMMERZ API data
-    // --------------------------------------------------
-
-    const paymentData = {
-      store_id: storeId,
-      store_passwd: storePassword,
-
-      total_amount: String(booking.totalAmount),
-      currency: "BDT",
-      tran_id: tranId,
-
-      // Movie ID
-      value_a: booking.movieId.toString(),
-
-      // Callback URLs
-      success_url: `${baseUrl}/api/payment/sslcommerz/success`,
-      fail_url: `${baseUrl}/api/payment/sslcommerz/fail`,
-      cancel_url: `${baseUrl}/api/payment/sslcommerz/cancel`,
-      ipn_url: `${baseUrl}/api/payment/sslcommerz/ipn`,
-
-      // Shipping
-      shipping_method: "NO",
-
-      // Product
-      product_name: "Movie Ticket",
-      product_category: "Movie",
-      product_profile: "non-physical-goods",
-
-      // Customer
-      cus_name: booking.customer.name,
-      cus_email: booking.customer.email,
-      cus_phone: booking.customer.phone,
-
-      cus_add1: "N/A",
-      cus_city: "Dhaka",
-      cus_postcode: "1000",
-      cus_country: "Bangladesh",
-
-      // Shipping information
-      ship_name: booking.customer.name,
-      ship_add1: "N/A",
-      ship_city: "Dhaka",
-      ship_postcode: "1000",
-      ship_country: "Bangladesh",
-    };
-
-    // --------------------------------------------------
-    // 10. Select Sandbox / Live endpoint
-    // --------------------------------------------------
-
-    const isLive = process.env.SSLCOMMERZ_IS_LIVE === "true";
-
-    const sslcommerzUrl = isLive
-      ? "https://securepay.sslcommerz.com/gwprocess/v4/api.php"
-      : "https://sandbox.sslcommerz.com/gwprocess/v4/api.php";
-
-    console.log("Initializing SSLCOMMERZ payment:", {
-      tranId,
-      amount: booking.totalAmount,
-      mode: isLive ? "LIVE" : "SANDBOX",
-      baseUrl,
+    const filteredRecords = applyFilters(records, {
+      search,
+      paymentStatus,
+      bookingStatus,
     });
 
-    // --------------------------------------------------
-    // 11. Convert data to application/x-www-form-urlencoded
-    // --------------------------------------------------
-
-    const formData = new URLSearchParams();
-
-    Object.entries(paymentData).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, String(value));
-      }
-    });
-
-    // --------------------------------------------------
-    // 12. Call SSLCOMMERZ directly
-    // --------------------------------------------------
-
-    const response = await fetch(sslcommerzUrl, {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-
-      body: formData.toString(),
-    });
-
-    // --------------------------------------------------
-    // 13. Check HTTP response
-    // --------------------------------------------------
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      console.error("SSLCOMMERZ HTTP error:", {
-        status: response.status,
-        statusText: response.statusText,
-        response: errorText,
-      });
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "SSLCOMMERZ server request failed",
-        },
-        { status: 502 }
-      );
-    }
-
-    // --------------------------------------------------
-    // 14. Parse SSLCOMMERZ response
-    // --------------------------------------------------
-
-    const apiResponse = await response.json();
-
-    console.log("SSLCOMMERZ response:", {
-      status: apiResponse?.status,
-      sessionkey: apiResponse?.sessionkey,
-      GatewayPageURL: apiResponse?.GatewayPageURL,
-    });
-
-    // --------------------------------------------------
-    // 15. Check gateway URL
-    // --------------------------------------------------
-
-    if (
-      !apiResponse ||
-      apiResponse.status !== "SUCCESS" ||
-      !apiResponse.GatewayPageURL
-    ) {
-      console.error(
-        "SSLCOMMERZ initialization failed:",
-        apiResponse
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            apiResponse?.failedreason ||
-            "Failed to initialize SSLCOMMERZ payment",
-        },
-        { status: 500 }
-      );
-    }
-
-    // --------------------------------------------------
-    // 16. Return payment URL
-    // --------------------------------------------------
+    const total = filteredRecords.length;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const safePage = Math.min(page, totalPages);
+    const skip = (safePage - 1) * limit;
 
     return NextResponse.json({
       success: true,
-      paymentUrl: apiResponse.GatewayPageURL,
+
+      payments: filteredRecords.slice(
+        skip,
+        skip + limit
+      ),
+
+      pagination: {
+        page: safePage,
+        limit,
+        total,
+        totalPages,
+      },
+
+      stats: calculateStats(filteredRecords),
     });
   } catch (error) {
-    console.error("SSLCOMMERZ payment error:", error);
+    console.error("GET admin payments error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Payment initialization failed",
+        message: "Failed to fetch payment data",
       },
       { status: 500 }
     );

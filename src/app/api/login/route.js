@@ -5,11 +5,10 @@ import { z } from "zod";
 import { connectDB } from "@/lib/mongodb";
 import Admin from "@/models/admin";
 import { createAdminToken } from "@/lib/adminAuth";
-
 import { checkRateLimit } from "@/lib/rateLimit";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   password: z.string().min(1),
 });
 
@@ -18,11 +17,10 @@ export async function POST(request) {
     const limit = checkRateLimit(request, 5, 15 * 60 * 1000);
 
     if (!limit.allowed) return limit.response;
-    const body = await request.json();
 
-    const result = loginSchema.safeParse(body);
+    const validation = loginSchema.safeParse(await request.json());
 
-    if (!result.success) {
+    if (!validation.success) {
       return NextResponse.json(
         {
           success: false,
@@ -32,16 +30,15 @@ export async function POST(request) {
       );
     }
 
-    const { email, password } = result.data;
+    const { email, password } = validation.data;
 
     await connectDB();
 
     const admin = await Admin.findOne({
-      email: email.toLowerCase().trim(),
-    });
+      email: email.toLowerCase(),
+    }).select("_id name email role passwordHash isActive");
 
-    // Don't reveal whether the email exists
-    if (!admin || !admin.isActive) {
+    if (!admin?.isActive) {
       return NextResponse.json(
         {
           success: false,
@@ -66,7 +63,6 @@ export async function POST(request) {
       );
     }
 
-    // Create signed JWT
     const token = createAdminToken(admin);
 
     const response = NextResponse.json({
@@ -80,7 +76,6 @@ export async function POST(request) {
       },
     });
 
-    // Store JWT in secure HTTP-only cookie
     response.cookies.set("admin_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -1,25 +1,22 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import {
   FiArrowUpRight,
   FiInstagram,
   FiFacebook,
   FiMapPin,
   FiPhone,
+  FiMessageCircle,
   FiNavigation,
 } from "react-icons/fi";
 import Image from "next/image";
-
-const LocationMap = dynamic(() => import("../LocationMap"), {
-  ssr: false,
-});
+import LocationMap from "../LocationMap";
 
 const navigation = [
-  { name: "Home", href: "#home" },
-  { name: "Gaming", href: "#gaming" },
-  { name: "Restaurant", href: "#restaurant" },
-  { name: "Fitness", href: "#fitness" },
+  { name: "Home", href: "/#home" },
+  { name: "Gaming", href: "/#gaming" },
+  { name: "Restaurant", href: "/#restaurant" },
+  { name: "Fitness", href: "/#packages" },
   { name: "Movies", href: "/movie" },
 ];
 
@@ -138,7 +135,6 @@ export default function Footer() {
                     name="Facebook"
                   />
 
-                  {/* TikTok - no Font Awesome dependency */}
                   <SocialButton
                     href="https://www.tiktok.com/@checkpointbd"
                     label="The Checkpoint on TikTok"
@@ -148,6 +144,12 @@ export default function Footer() {
                       </span>
                     }
                     name="TikTok"
+                  />
+                  <SocialButton
+                    href="https://wa.me/8801844240483"
+                    label="The Checkpoint on Whatsapp"
+                    icon={<FiMessageCircle size={23} />}
+                    name="WhatsApp"
                   />
                 </div>
               </div>
@@ -196,7 +198,7 @@ export default function Footer() {
         <div className="mt-14 grid gap-12 border-t border-white/[0.07] pt-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_0.7fr_0.7fr]">
           {/* BRAND */}
           <div>
-            <a href="#home" className="inline-flex items-center gap-3">
+            <a href="/#home" className="inline-flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600">
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg shadow-lg shadow-blue-600/10 transition-transform duration-200 hover:scale-[1.08] hover:-rotate-1 active:scale-[0.94]">
                   <Image
@@ -204,7 +206,6 @@ export default function Footer() {
                     alt="The Checkpoint Logo"
                     width={40}
                     height={40}
-                    loading="lazy"
                     className="h-full w-full object-cover"
                   />
                 </div>

@@ -30,7 +30,7 @@ export default function Gallery() {
           {/* Header */}
           <header className="mb-12 text-center">
             <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-blue-400">
-              Explore The Checkpoint
+              Explore The Checkpoint Gallery
             </p>
 
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
@@ -42,14 +42,11 @@ export default function Gallery() {
           <div className="space-y-16">
             {gallerySections.map((section) => (
               <div key={section.folder}>
-                <h3 className="mb-8 text-xl font-semibold text-white sm:text-2xl">
-                  {section.title}
-                </h3>
 
                 <div className="space-y-12">
                   {section.routes.map((route) => (
                     <div key={route.folder}>
-                      <h4 className="mb-5 text-lg font-medium text-gray-200 sm:text-xl">
+                      <h4 className="text-xl font-black uppercase tracking-[0.1em] text-blue-400 sm:text-2xl pb-10">
                         {route.folder
                           .replace(/-/g, " ")
                           .replace(/\b\w/g, (char) => char.toUpperCase())}

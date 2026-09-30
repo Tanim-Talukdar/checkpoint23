@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { motion } from "framer-motion";
 import {
   FiCalendar,
   FiClock,
@@ -17,35 +16,41 @@ import {
   FiMapPin,
 } from "react-icons/fi";
 
+const EMPTY_CUSTOMER = {
+  name: "",
+  email: "",
+  phone: "",
+};
+
 export default function BookingPage() {
   const { movieId } = useParams();
   const router = useRouter();
 
+  const formRef = useRef(null);
+  const nameRef = useRef(null);
+  const emailRef = useRef(null);
+  const phoneRef = useRef(null);
+
   const [movie, setMovie] = useState(null);
   const [showtimes, setShowtimes] = useState([]);
-
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedShowtime, setSelectedShowtime] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
-
   const [occupiedSeats, setOccupiedSeats] = useState([]);
-
-  const [customer, setCustomer] = useState({
-    name: "",
-    email: "",
-    phone: "",
-  });
+  const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
 
   const [loading, setLoading] = useState(true);
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
 
-  // -----------------------------
+  // --------------------------------
   // Fetch movie + showtimes
-  // -----------------------------
+  // --------------------------------
   useEffect(() => {
     if (!movieId) return;
+
+    const controller = new AbortController();
 
     async function loadData() {
       try {
@@ -53,8 +58,12 @@ export default function BookingPage() {
         setError("");
 
         const [movieRes, showtimeRes] = await Promise.all([
-          fetch(`/api/movies/${movieId}`),
-          fetch(`/api/showtimes?movieId=${movieId}`),
+          fetch(`/api/movies/${movieId}`, {
+            signal: controller.signal,
+          }),
+          fetch(`/api/showtimes?movieId=${movieId}`, {
+            signal: controller.signal,
+          }),
         ]);
 
         if (!movieRes.ok) {
@@ -65,10 +74,16 @@ export default function BookingPage() {
           throw new Error("Failed to load showtimes");
         }
 
-        const movieData = await movieRes.json();
-        const showtimeData = await showtimeRes.json();
+        const [movieData, showtimeData] = await Promise.all([
+          movieRes.json(),
+          showtimeRes.json(),
+        ]);
 
-        setMovie(movieData.movie || movieData.data || movieData);
+        setMovie(
+          movieData.movie ||
+            movieData.data ||
+            movieData
+        );
 
         setShowtimes(
           showtimeData.showtimes ||
@@ -76,58 +91,91 @@ export default function BookingPage() {
             []
         );
       } catch (err) {
-        console.error(err);
+        if (err.name === "AbortError") return;
+
+        console.error("Booking data error:", err);
         setError(err.message || "Something went wrong");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadData();
+
+    return () => controller.abort();
   }, [movieId]);
 
-  // -----------------------------
-  // Unique dates
-  // -----------------------------
-  const dates = useMemo(() => {
-    const unique = [
-      ...new Set(showtimes.map((showtime) => showtime.date)),
-    ];
+  // --------------------------------
+  // Dates
+  // --------------------------------
+  const dates = useMemo(
+    () =>
+      [...new Set(
+        showtimes
+          .map((showtime) => showtime.date)
+          .filter(Boolean)
+      )].sort(),
+    [showtimes]
+  );
 
-    return unique.sort();
-  }, [showtimes]);
-
-  // -----------------------------
-  // Set first date
-  // -----------------------------
   useEffect(() => {
-    if (dates.length > 0 && !selectedDate) {
+    if (dates.length && !dates.includes(selectedDate)) {
       setSelectedDate(dates[0]);
     }
   }, [dates, selectedDate]);
 
-  // -----------------------------
+  // --------------------------------
   // Showtimes for selected date
-  // -----------------------------
-  const dateShowtimes = useMemo(() => {
-    return showtimes.filter(
-      (showtime) => showtime.date === selectedDate
-    );
-  }, [showtimes, selectedDate]);
+  // --------------------------------
+  const dateShowtimes = useMemo(
+    () =>
+      showtimes.filter(
+        (showtime) => showtime.date === selectedDate
+      ),
+    [showtimes, selectedDate]
+  );
 
-  // -----------------------------
-  // Change date
-  // -----------------------------
+  // --------------------------------
+  // Hall
+  // --------------------------------
+  const hall = selectedShowtime?.hallId;
+
+  const rows = useMemo(() => {
+    if (!hall?.rows) return [];
+
+    if (Array.isArray(hall.rows)) {
+      return hall.rows;
+    }
+
+    if (typeof hall.rows === "number") {
+      return Array.from(
+        { length: hall.rows },
+        (_, index) =>
+          String.fromCharCode(65 + index)
+      );
+    }
+
+    return [];
+  }, [hall]);
+
+  const seatsPerRow = hall?.seatsPerRow || 10;
+
+  // --------------------------------
+  // Date selection
+  // --------------------------------
   function handleDateChange(date) {
     setSelectedDate(date);
     setSelectedShowtime(null);
     setSelectedSeats([]);
     setOccupiedSeats([]);
+    setError("");
   }
 
-  // -----------------------------
-  // Select showtime
-  // -----------------------------
+  // --------------------------------
+  // Showtime selection
+  // --------------------------------
   async function handleShowtimeSelect(showtime) {
     try {
       setSelectedShowtime(showtime);
@@ -150,40 +198,18 @@ export default function BookingPage() {
 
       setOccupiedSeats(data.occupiedSeats || []);
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Failed to load seats");
+      console.error("Occupied seats error:", err);
+      setError(
+        err.message || "Failed to load seats"
+      );
     } finally {
       setLoadingSeats(false);
     }
   }
 
-  // -----------------------------
-  // Hall configuration
-  // -----------------------------
-  const hall = selectedShowtime?.hallId;
-
-  const rows = useMemo(() => {
-    if (!hall?.rows) return [];
-
-    if (Array.isArray(hall.rows)) {
-      return hall.rows;
-    }
-
-    if (typeof hall.rows === "number") {
-      return Array.from(
-        { length: hall.rows },
-        (_, index) => String.fromCharCode(65 + index)
-      );
-    }
-
-    return [];
-  }, [hall]);
-
-  const seatsPerRow = hall?.seatsPerRow || 10;
-
-  // -----------------------------
-  // Seat toggle
-  // -----------------------------
+  // --------------------------------
+  // Seat selection
+  // --------------------------------
   function toggleSeat(seat) {
     if (occupiedSeats.includes(seat)) return;
 
@@ -193,24 +219,18 @@ export default function BookingPage() {
       }
 
       if (current.length >= 8) {
+        setError("You can select a maximum of 8 seats.");
         return current;
       }
 
+      setError("");
       return [...current, seat];
     });
   }
 
-  // -----------------------------
-  // Total
-  // -----------------------------
-  const ticketPrice =
-    Number(selectedShowtime?.ticketPrice) || 0;
-
-  const totalAmount = ticketPrice * selectedSeats.length;
-
-  // -----------------------------
-  // Customer change
-  // -----------------------------
+  // --------------------------------
+  // Customer
+  // --------------------------------
   function handleCustomerChange(e) {
     const { name, value } = e.target;
 
@@ -218,34 +238,59 @@ export default function BookingPage() {
       ...current,
       [name]: value,
     }));
+
+    if (error) {
+      setError("");
+    }
   }
 
-  // -----------------------------
+  // --------------------------------
+  // Scroll to customer form
+  // --------------------------------
+  function focusCustomerField(ref) {
+    formRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    setTimeout(() => {
+      ref.current?.focus();
+    }, 350);
+  }
+
+  // --------------------------------
   // Booking
-  // -----------------------------
+  // --------------------------------
   async function handleBooking() {
     if (!selectedShowtime) {
       setError("Please select a showtime.");
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
       return;
     }
 
-    if (selectedSeats.length === 0) {
+    if (!selectedSeats.length) {
       setError("Please select at least one seat.");
       return;
     }
 
     if (!customer.name.trim()) {
       setError("Please enter your name.");
+      focusCustomerField(nameRef);
       return;
     }
 
     if (!customer.email.trim()) {
       setError("Please enter your email.");
+      focusCustomerField(emailRef);
       return;
     }
 
     if (!customer.phone.trim()) {
       setError("Please enter your phone number.");
+      focusCustomerField(phoneRef);
       return;
     }
 
@@ -264,7 +309,9 @@ export default function BookingPage() {
           hallId: selectedShowtime.hallId._id,
           seats: selectedSeats,
           customer,
-          totalAmount,
+          totalAmount:
+            Number(selectedShowtime.ticketPrice) *
+            selectedSeats.length,
         }),
       });
 
@@ -289,16 +336,22 @@ export default function BookingPage() {
         `/movie/${movieId}/booking/payment?bookingId=${bookingId}`
       );
     } catch (err) {
-      console.error(err);
+      console.error("Booking error:", err);
+
       setError(err.message || "Booking failed");
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
     } finally {
       setBooking(false);
     }
   }
 
-  // -----------------------------
-  // Date formatter
-  // -----------------------------
+  // --------------------------------
+  // Helpers
+  // --------------------------------
   function formatDate(date) {
     const d = new Date(`${date}T00:00:00`);
 
@@ -313,9 +366,15 @@ export default function BookingPage() {
     };
   }
 
-  // -----------------------------
+  const ticketPrice =
+    Number(selectedShowtime?.ticketPrice) || 0;
+
+  const totalAmount =
+    ticketPrice * selectedSeats.length;
+
+  // --------------------------------
   // Loading
-  // -----------------------------
+  // --------------------------------
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#05070d] text-white">
@@ -332,9 +391,9 @@ export default function BookingPage() {
     );
   }
 
-  // -----------------------------
-  // Error / Movie not found
-  // -----------------------------
+  // --------------------------------
+  // Movie error
+  // --------------------------------
   if (!movie) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#05070d] px-5 text-white">
@@ -359,9 +418,7 @@ export default function BookingPage() {
     <main className="min-h-screen bg-[#05070d] pb-32 pt-24 text-white">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
 
-        {/* =========================================
-            MOVIE HEADER
-        ========================================== */}
+        {/* MOVIE HEADER */}
         <section className="relative mb-6 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f19] shadow-2xl">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(37,99,235,0.15),transparent_35%)]" />
 
@@ -379,11 +436,9 @@ export default function BookingPage() {
             </div>
 
             <div className="min-w-0 flex-1 py-1">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-blue-400">
-                  Booking
-                </span>
-              </div>
+              <span className="mb-2 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-blue-400">
+                Booking
+              </span>
 
               <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
                 {movie.title}
@@ -414,7 +469,11 @@ export default function BookingPage() {
                 <div className="mt-3 flex items-center gap-2 text-xs font-medium text-blue-400">
                   <FiCalendar />
                   {selectedShowtime.date}
-                  <span className="text-slate-600">•</span>
+
+                  <span className="text-slate-600">
+                    •
+                  </span>
+
                   <FiClock />
                   {selectedShowtime.startTime}
                 </div>
@@ -423,42 +482,31 @@ export default function BookingPage() {
           </div>
         </section>
 
-        {/* =========================================
-            ERROR
-        ========================================== */}
+        {/* ERROR */}
         {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/25 bg-red-500/[0.08] px-4 py-3.5 text-sm text-red-300"
-          >
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/25 bg-red-500/[0.08] px-4 py-3.5 text-sm text-red-300">
             <FiAlertCircle className="mt-0.5 shrink-0 text-red-400" />
-
             <span>{error}</span>
-          </motion.div>
+          </div>
         )}
 
-        {/* =========================================
-            DATE
-        ========================================== */}
+        {/* DATE */}
         <section className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <FiCalendar className="text-blue-400" />
+          <div className="mb-3">
+            <div className="flex items-center gap-2">
+              <FiCalendar className="text-blue-400" />
 
-                <h2 className="text-base font-semibold">
-                  Select Date
-                </h2>
-              </div>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Choose your preferred date
-              </p>
+              <h2 className="text-base font-semibold">
+                Select Date
+              </h2>
             </div>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Choose your preferred date
+            </p>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="scrollbar-hide flex gap-3 overflow-x-auto pb-2">
             {dates.map((date) => {
               const formatted = formatDate(date);
               const active = selectedDate === date;
@@ -466,6 +514,7 @@ export default function BookingPage() {
               return (
                 <button
                   key={date}
+                  type="button"
                   onClick={() => handleDateChange(date)}
                   className={`group min-w-[82px] rounded-2xl border p-3 text-center transition-all duration-200 ${
                     active
@@ -502,9 +551,7 @@ export default function BookingPage() {
           </div>
         </section>
 
-        {/* =========================================
-            SHOWTIME
-        ========================================== */}
+        {/* SHOWTIME */}
         <section className="mb-6">
           <div className="mb-3">
             <div className="flex items-center gap-2">
@@ -528,6 +575,7 @@ export default function BookingPage() {
               return (
                 <button
                   key={showtime._id}
+                  type="button"
                   onClick={() =>
                     handleShowtimeSelect(showtime)
                   }
@@ -549,11 +597,11 @@ export default function BookingPage() {
                     </span>
 
                     <FiChevronRight
-                      className={`transition-transform ${
+                      className={
                         active
                           ? "text-white"
-                          : "text-slate-600 group-hover:translate-x-0.5 group-hover:text-blue-400"
-                      }`}
+                          : "text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-400"
+                      }
                     />
                   </div>
 
@@ -571,7 +619,7 @@ export default function BookingPage() {
             })}
           </div>
 
-          {dateShowtimes.length === 0 && (
+          {!dateShowtimes.length && (
             <div className="rounded-2xl border border-white/10 bg-[#0a0f19] px-4 py-6 text-center">
               <FiClock className="mx-auto mb-2 text-xl text-slate-600" />
 
@@ -582,16 +630,9 @@ export default function BookingPage() {
           )}
         </section>
 
-        {/* =========================================
-            SEATS
-        ========================================== */}
+        {/* SEATS */}
         {selectedShowtime && (
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f19] shadow-xl"
-          >
-            {/* Seat header */}
+          <section className="mb-6 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f19] shadow-xl">
             <div className="border-b border-white/5 px-4 py-4 sm:px-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -632,7 +673,7 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {/* SEAT AREA */}
+              {/* SEATS */}
               {loadingSeats ? (
                 <div className="flex min-h-[250px] flex-col items-center justify-center gap-3">
                   <FiLoader className="animate-spin text-2xl text-blue-400" />
@@ -649,14 +690,12 @@ export default function BookingPage() {
                         key={row}
                         className="flex items-center gap-2"
                       >
-                        {/* Row label */}
                         <div className="flex w-6 shrink-0 items-center justify-center">
                           <span className="text-[10px] font-semibold text-slate-600">
                             {row}
                           </span>
                         </div>
 
-                        {/* Seats */}
                         <div
                           className="grid flex-1 gap-1.5"
                           style={{
@@ -666,18 +705,16 @@ export default function BookingPage() {
                           {Array.from(
                             { length: seatsPerRow },
                             (_, index) => {
-                              const seatNumber = index + 1;
-                              const seat = `${row}${seatNumber}`;
-
+                              const seat = `${row}${index + 1}`;
                               const occupied =
                                 occupiedSeats.includes(seat);
-
                               const selected =
                                 selectedSeats.includes(seat);
 
                               return (
                                 <button
                                   key={seat}
+                                  type="button"
                                   disabled={occupied}
                                   onClick={() =>
                                     toggleSeat(seat)
@@ -691,13 +728,13 @@ export default function BookingPage() {
                                   }`}
                                   className={`group relative flex aspect-square items-center justify-center rounded-md border text-[8px] font-semibold transition-all duration-150 sm:rounded-lg sm:text-[9px] ${
                                     occupied
-                                      ? "cursor-not-allowed border-red-500/30 bg-red-500 text-white shadow-[0_0_8px_rgba(239,68,68,0.15)]"
+                                      ? "cursor-not-allowed border-red-500/30 bg-red-500 text-white"
                                       : selected
                                       ? "border-blue-400 bg-blue-500 text-white shadow-[0_0_14px_rgba(59,130,246,0.45)]"
                                       : "border-white/5 bg-[#111a29] text-slate-500 hover:border-blue-500/50 hover:bg-blue-500/20 hover:text-blue-300"
                                   }`}
                                 >
-                                  {seatNumber}
+                                  {index + 1}
                                 </button>
                               );
                             }
@@ -719,7 +756,7 @@ export default function BookingPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-[3px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.35)]" />
+                  <span className="h-3 w-3 rounded-[3px] bg-blue-500" />
                   <span className="text-[10px] text-slate-500">
                     Selected
                   </span>
@@ -733,17 +770,15 @@ export default function BookingPage() {
                 </div>
               </div>
             </div>
-          </motion.section>
+          </section>
         )}
 
-        {/* =========================================
-            CUSTOMER INFORMATION
-        ========================================== */}
+        {/* CUSTOMER INFORMATION */}
         {selectedSeats.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 rounded-3xl border border-white/10 bg-[#0a0f19] p-4 shadow-xl sm:p-6"
+          <section
+            ref={formRef}
+            id="customer-information"
+            className="mb-6 scroll-mt-24 rounded-3xl border border-white/10 bg-[#0a0f19] p-4 shadow-xl sm:p-6"
           >
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
@@ -772,10 +807,12 @@ export default function BookingPage() {
                   <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-600" />
 
                   <input
+                    ref={nameRef}
                     name="name"
                     value={customer.name}
                     onChange={handleCustomerChange}
                     placeholder="Enter your name"
+                    autoComplete="name"
                     className="h-11 w-full rounded-xl border border-white/10 bg-[#070b12] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-700 focus:border-blue-500/60 focus:bg-[#080d15]"
                   />
                 </div>
@@ -791,11 +828,13 @@ export default function BookingPage() {
                   <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-600" />
 
                   <input
+                    ref={emailRef}
                     name="email"
                     type="email"
                     value={customer.email}
                     onChange={handleCustomerChange}
                     placeholder="Enter your email"
+                    autoComplete="email"
                     className="h-11 w-full rounded-xl border border-white/10 bg-[#070b12] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-700 focus:border-blue-500/60 focus:bg-[#080d15]"
                   />
                 </div>
@@ -811,40 +850,31 @@ export default function BookingPage() {
                   <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-600" />
 
                   <input
+                    ref={phoneRef}
                     name="phone"
+                    type="tel"
                     value={customer.phone}
                     onChange={handleCustomerChange}
                     placeholder="Enter your phone"
+                    autoComplete="tel"
                     className="h-11 w-full rounded-xl border border-white/10 bg-[#070b12] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-slate-700 focus:border-blue-500/60 focus:bg-[#080d15]"
                   />
                 </div>
               </div>
             </div>
-          </motion.section>
+          </section>
         )}
 
-        {/* =========================================
-            DESKTOP SUMMARY
-        ========================================== */}
+        {/* DESKTOP SUMMARY */}
         {selectedShowtime && selectedSeats.length > 0 && (
           <section className="hidden overflow-hidden rounded-3xl border border-blue-500/20 bg-[#0a101c] shadow-2xl md:block">
             <div className="flex items-center justify-between gap-6 p-5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span>{selectedDate}</span>
-
-                  <span className="text-slate-700">
-                    •
-                  </span>
-
-                  <span>
-                    {selectedShowtime.startTime}
-                  </span>
-
-                  <span className="text-slate-700">
-                    •
-                  </span>
-
+                  <span>•</span>
+                  <span>{selectedShowtime.startTime}</span>
+                  <span>•</span>
                   <span>{hall?.name}</span>
                 </div>
 
@@ -871,6 +901,7 @@ export default function BookingPage() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleBooking}
                   disabled={booking}
                   className="flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-semibold shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -893,9 +924,7 @@ export default function BookingPage() {
         )}
       </div>
 
-      {/* =========================================
-          MOBILE STICKY SUMMARY
-      ========================================== */}
+      {/* MOBILE SUMMARY */}
       {selectedShowtime && selectedSeats.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#070b12]/95 p-3 shadow-2xl backdrop-blur-2xl md:hidden">
           <div className="mx-auto flex max-w-5xl items-center gap-3">
@@ -917,6 +946,7 @@ export default function BookingPage() {
             </div>
 
             <button
+              type="button"
               onClick={handleBooking}
               disabled={booking}
               className="flex h-11 shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"

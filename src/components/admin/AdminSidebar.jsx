@@ -169,10 +169,7 @@ export default function AdminSidebar() {
             </p>
           </div>
 
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-500 transition hover:bg-red-500/5 hover:text-red-400">
-            <FiLogOut size={17} />
-            Logout
-          </button>
+
         </div>
       </aside>
     </>

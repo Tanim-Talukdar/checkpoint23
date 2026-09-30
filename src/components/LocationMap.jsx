@@ -4,7 +4,7 @@ export default function LocationMap() {
   return (
     <div className="relative h-full min-h-[360px] w-full overflow-hidden">
       <iframe
-        src="https://www.google.com/maps?q=23.820677610325287,90.42723974608134&z=16&output=embed"
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3649.9450131572203!2d90.42470297659835!3d23.820554278622655!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3755c700213ef523%3A0xcfc6ad954899221c!2sThe%20Checkpoint!5e0!3m2!1sen!2sbd!4v1790763526761!5m2!1sen!2sbd"
         className="h-full w-full border-0"
         loading="lazy"
         allowFullScreen

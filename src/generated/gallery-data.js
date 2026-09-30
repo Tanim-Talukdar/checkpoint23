@@ -4,6 +4,50 @@ const gallerySections = [
     "title": "Gallery",
     "routes": [
       {
+        "folder": "swimming-pool",
+        "images": [
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701391/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/01.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701392/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/02.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701393/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/03.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701394/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/04.webp"
+        ]
+      },
+      {
+        "folder": "Movie-Theater",
+        "images": [
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701371/the-checkpoint/Checkpoint-Pictures-Optimized/Movie-Theater/01.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701373/the-checkpoint/Checkpoint-Pictures-Optimized/Movie-Theater/02.webp"
+        ]
+      },
+      {
+        "folder": "gym&steamBath",
+        "images": [
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790708319/Checkpoint/gym-steamBath/01.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790708321/Checkpoint/gym-steamBath/02.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790708323/Checkpoint/gym-steamBath/03.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790708324/Checkpoint/gym-steamBath/04.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790708325/Checkpoint/gym-steamBath/05.webp",
+        ]
+      },
+
+      {
+        "folder": "playground",
+        "images": [
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701377/the-checkpoint/Checkpoint-Pictures-Optimized/playground/11301219-50b4-43a2-9f0f-45ac4475f40e.jpg",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701381/the-checkpoint/Checkpoint-Pictures-Optimized/playground/3bdf004e-b8e8-42ac-8dab-90f0c52a8539.jpg"
+        ]
+      },
+      {
+        "folder": "restaurant-area",
+        "images": [
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701383/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/01.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701385/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/02.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701386/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/03.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701388/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/04.webp",
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701389/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/05.webp"
+        ]
+      },
+      {
         "folder": "Billards-and-table-tennis",
         "images": [
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790701310/the-checkpoint/Checkpoint-Pictures-Optimized/Billards-and-table-tennis/1.webp",
@@ -14,7 +58,7 @@ const gallerySections = [
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790701324/the-checkpoint/Checkpoint-Pictures-Optimized/Billards-and-table-tennis/6.jpg",
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790701328/the-checkpoint/Checkpoint-Pictures-Optimized/Billards-and-table-tennis/7.jpg",
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790701329/the-checkpoint/Checkpoint-Pictures-Optimized/Billards-and-table-tennis/8.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701331/the-checkpoint/Checkpoint-Pictures-Optimized/Billards-and-table-tennis/9.webp"
+          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701331/the-checkpoint/Checkpoint-Pictures-Optimized/Billards-and-table-tennis/9.webp",
         ]
       },
       {
@@ -45,43 +89,10 @@ const gallerySections = [
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790701364/the-checkpoint/Checkpoint-Pictures-Optimized/Gaming-lounge/24.webp"
         ]
       },
-      {
-        "folder": "gym&steamBath",
-        "images": []
-      },
-      {
-        "folder": "Movie-Theater",
-        "images": [
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701371/the-checkpoint/Checkpoint-Pictures-Optimized/Movie-Theater/01.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701373/the-checkpoint/Checkpoint-Pictures-Optimized/Movie-Theater/02.webp"
-        ]
-      },
-      {
-        "folder": "playground",
-        "images": [
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701377/the-checkpoint/Checkpoint-Pictures-Optimized/playground/11301219-50b4-43a2-9f0f-45ac4475f40e.jpg",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701381/the-checkpoint/Checkpoint-Pictures-Optimized/playground/3bdf004e-b8e8-42ac-8dab-90f0c52a8539.jpg"
-        ]
-      },
-      {
-        "folder": "restaurant-area",
-        "images": [
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701383/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/01.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701385/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/02.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701386/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/03.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701388/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/04.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701389/the-checkpoint/Checkpoint-Pictures-Optimized/restaurant-area/05.webp"
-        ]
-      },
-      {
-        "folder": "swimming-pool",
-        "images": [
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701391/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/01.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701392/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/02.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701393/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/03.webp",
-          "https://res.cloudinary.com/qds5td8c/image/upload/v1790701394/the-checkpoint/Checkpoint-Pictures-Optimized/swimming-pool/04.webp"
-        ]
-      }
+
+
+
+
     ]
   }
 ];

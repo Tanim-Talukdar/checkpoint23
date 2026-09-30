@@ -125,7 +125,7 @@ const BookingSchema = new mongoose.Schema(
 
     expiresAt: {
       type: Date,
-      default: () => new Date(Date.now() + 10 * 60 * 1000),
+      default: () => new Date(Date.now() + 6 * 60 * 1000),
     },
   },
   {
@@ -148,7 +148,18 @@ BookingSchema.index(
 // Prevent the same seat from being booked twice
 BookingSchema.index(
   { showtimeId: 1, seats: 1 },
-  { unique: true }
+  {
+    unique: true,
+    partialFilterExpression: {
+      $or: [
+        { bookingStatus: "confirmed" },
+        {
+          bookingStatus: "pending",
+          paymentStatus: "pending",
+        },
+      ],
+    },
+  }
 );
 
 export default mongoose.models.Booking ||

@@ -20,12 +20,13 @@ const movieSchema = z.object({
   cast: z.array(z.string()).optional().default([]),
 });
 
-// PUBLIC
 export async function GET() {
   try {
     await connectDB();
 
-    const movies = await Movie.find().sort({ createdAt: -1 });
+    const movies = await Movie.find()
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({
       success: true,
@@ -44,7 +45,6 @@ export async function GET() {
   }
 }
 
-// ADMIN ONLY
 export async function POST(request) {
   const auth = await requireAdmin();
 
@@ -57,19 +57,20 @@ export async function POST(request) {
       { status: 401 }
     );
   }
+
   const limit = checkRateLimit(request, 10, 10 * 60 * 1000);
+
   if (!limit.allowed) return limit.response;
+
   try {
-    const body = await request.json();
+    const validation = movieSchema.safeParse(await request.json());
 
-    const result = movieSchema.safeParse(body);
-
-    if (!result.success) {
+    if (!validation.success) {
       return NextResponse.json(
         {
           success: false,
           message: "Invalid movie data",
-          errors: result.error.flatten(),
+          errors: validation.error.flatten(),
         },
         { status: 400 }
       );
@@ -77,7 +78,7 @@ export async function POST(request) {
 
     await connectDB();
 
-    const movie = await Movie.create(result.data);
+    const movie = await Movie.create(validation.data);
 
     return NextResponse.json(
       {

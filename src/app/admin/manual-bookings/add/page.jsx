@@ -26,6 +26,50 @@ const seats = rows.flatMap((row) =>
   }))
 );
 
+const sectionClass =
+  "rounded-2xl border border-white/[0.08] bg-[#07101c]/70 p-5";
+
+const inputClass =
+  "h-12 w-full rounded-xl border border-white/[0.08] bg-[#050A14] px-4 text-sm text-white outline-none transition focus:border-blue-500/50";
+
+const dateTimeInputClass =
+  `${inputClass} [color-scheme:dark]`;
+
+const selectClass =
+  `${inputClass} appearance-none pr-10`;
+
+const mutedLabelClass =
+  "mb-2 block text-sm text-slate-300";
+
+const sectionTitleClass =
+  "mb-4 text-sm font-semibold uppercase tracking-wider text-slate-500";
+
+const smallTextClass =
+  "text-xs text-slate-500";
+
+const notificationStyles = {
+  success: {
+    wrapper:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+    icon: <FiCheck className="text-lg" />,
+  },
+  error: {
+    wrapper:
+      "border-red-500/30 bg-red-500/10 text-red-400",
+    icon: <FiX className="text-lg" />,
+  },
+  warning: {
+    wrapper:
+      "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
+    icon: <FiAlertCircle className="text-lg" />,
+  },
+  info: {
+    wrapper:
+      "border-blue-500/30 bg-blue-500/10 text-blue-400",
+    icon: <FiInfo className="text-lg" />,
+  },
+};
+
 export default function AddManualBookingPage() {
   const router = useRouter();
 
@@ -42,15 +86,27 @@ export default function AddManualBookingPage() {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
 
-  // ==================================================
-  // NOTIFICATION
-  // ==================================================
-
   const [notification, setNotification] = useState({
     show: false,
     type: "info",
     message: "",
   });
+
+  const [form, setForm] = useState({
+    movieId: "",
+    showtimeId: "",
+    movieName: "",
+    time: "",
+    date: "",
+    customerName: "",
+    phone: "",
+    email: "",
+    amount: "2500",
+  });
+
+  // ==================================================
+  // NOTIFICATION
+  // ==================================================
 
   const showNotification = (type, message) => {
     setNotification({
@@ -74,47 +130,9 @@ export default function AddManualBookingPage() {
     }));
   };
 
-  const notificationStyles = {
-    success: {
-      wrapper:
-        "border-green-500/30 bg-green-500/10 text-green-400",
-      icon: <FiCheck className="text-lg" />,
-    },
-
-    error: {
-      wrapper:
-        "border-red-500/30 bg-red-500/10 text-red-400",
-      icon: <FiX className="text-lg" />,
-    },
-
-    warning: {
-      wrapper:
-        "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
-      icon: <FiAlertCircle className="text-lg" />,
-    },
-
-    info: {
-      wrapper:
-        "border-blue-500/30 bg-blue-500/10 text-blue-400",
-      icon: <FiInfo className="text-lg" />,
-    },
-  };
-
-  // ==================================================
-  // FORM
-  // ==================================================
-
-  const [form, setForm] = useState({
-    movieId: "",
-    showtimeId: "",
-    movieName: "",
-    time: "",
-    date: "",
-    customerName: "",
-    phone: "",
-    email: "",
-    amount: "2500",
-  });
+  const notificationStyle =
+    notificationStyles[notification.type] ||
+    notificationStyles.info;
 
   // ==================================================
   // LOAD MOVIES
@@ -221,12 +239,14 @@ export default function AddManualBookingPage() {
   // SELECTED SHOWTIME
   // ==================================================
 
-  const selectedShowtime = useMemo(() => {
-    return showtimes.find(
-      (showtime) =>
-        showtime._id === form.showtimeId
-    );
-  }, [showtimes, form.showtimeId]);
+  const selectedShowtime = useMemo(
+    () =>
+      showtimes.find(
+        (showtime) =>
+          showtime._id === form.showtimeId
+      ),
+    [showtimes, form.showtimeId]
+  );
 
   // ==================================================
   // PRICE
@@ -501,7 +521,10 @@ export default function AddManualBookingPage() {
 
         const amount = Number(form.amount);
 
-        if (!Number.isFinite(amount) || amount < 0) {
+        if (
+          !Number.isFinite(amount) ||
+          amount < 0
+        ) {
           showNotification(
             "warning",
             "Please enter a valid amount."
@@ -532,13 +555,10 @@ export default function AddManualBookingPage() {
         "/api/manual-bookings",
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
           },
-
           credentials: "include",
-
           body: JSON.stringify(payload),
         }
       );
@@ -582,13 +602,8 @@ export default function AddManualBookingPage() {
     }
   };
 
-  const notificationStyle =
-    notificationStyles[notification.type] ||
-    notificationStyles.info;
-
   return (
-    <div className="min-h-screen bg-[#08090c] text-white">
-
+    <div className="min-h-screen bg-[#050A14] text-white">
       {/* ==================================================
           NOTIFICATION
       ================================================== */}
@@ -614,7 +629,7 @@ export default function AddManualBookingPage() {
           <button
             type="button"
             onClick={closeNotification}
-            className="shrink-0 text-white/40 transition hover:text-white"
+            className="shrink-0 text-slate-500 transition hover:text-white"
           >
             <FiX />
           </button>
@@ -622,132 +637,90 @@ export default function AddManualBookingPage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-
         {/* HEADER */}
 
         <div className="mb-8 flex items-center gap-4">
-
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 transition hover:bg-white/10"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] transition hover:bg-white/[0.06]"
           >
             <FiArrowLeft />
           </button>
 
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-semibold">
               Add Manual Booking
             </h1>
 
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-slate-500">
               Create an offline cash booking
             </p>
           </div>
-
         </div>
 
         <form
           onSubmit={handleSubmit}
           className="space-y-6"
         >
-
           {/* BOOKING TYPE */}
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+          <section className={sectionClass}>
+            <h2 className={sectionTitleClass}>
               Booking Type
             </h2>
 
             <div className="grid gap-3 sm:grid-cols-2">
-
-              <button
-                type="button"
+              <BookingTypeButton
+                active={bookingType === "seat"}
                 onClick={() =>
                   handleBookingTypeChange("seat")
                 }
-                className={`rounded-xl border p-4 text-left transition ${
-                  bookingType === "seat"
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <FiFilm />
+                title="Seat Booking"
+                description="Select movie, showtime and seats"
+              />
 
-                  <div>
-                    <p className="font-semibold">
-                      Seat Booking
-                    </p>
-
-                    <p className="mt-1 text-xs text-white/50">
-                      Select movie, showtime and seats
-                    </p>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
+              <BookingTypeButton
+                active={
+                  bookingType === "full-hall"
+                }
                 onClick={() =>
                   handleBookingTypeChange(
                     "full-hall"
                   )
                 }
-                className={`rounded-xl border p-4 text-left transition ${
-                  bookingType === "full-hall"
-                    ? "border-blue-500/50 bg-blue-500/10"
-                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <FiFilm />
-
-                  <div>
-                    <p className="font-semibold">
-                      Full Hall
-                    </p>
-
-                    <p className="mt-1 text-xs text-white/50">
-                      Book the entire Hall 1
-                    </p>
-                  </div>
-                </div>
-              </button>
-
+                title="Full Hall"
+                description="Book the entire Hall 1"
+              />
             </div>
           </section>
 
           {/* MOVIE & SHOWTIME */}
 
           {bookingType === "seat" && (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+            <section className={sectionClass}>
+              <h2 className={sectionTitleClass}>
                 Movie & Showtime
               </h2>
 
               <div className="grid gap-5 md:grid-cols-2">
-
                 {/* MOVIE */}
 
                 <div>
-                  <label className="mb-2 block text-sm text-white/70">
+                  <label className={mutedLabelClass}>
                     Movie
                   </label>
 
                   <div className="relative">
-
                     <select
                       value={form.movieId}
                       onChange={handleMovieChange}
                       disabled={loadingMovies}
-                      className="w-full appearance-none rounded-xl border border-white/10 bg-[#11151d] px-4 py-3 pr-10 text-sm text-white outline-none transition focus:border-blue-500/50"
+                      className={selectClass}
                     >
                       <option
                         value=""
-                        className="bg-[#11151d] text-white"
+                        className="bg-[#07101c] text-white"
                       >
                         {loadingMovies
                           ? "Loading movies..."
@@ -758,39 +731,39 @@ export default function AddManualBookingPage() {
                         <option
                           key={movie._id}
                           value={movie._id}
-                          className="bg-[#11151d] text-white"
+                          className="bg-[#07101c] text-white"
                         >
                           {movie.title}
                         </option>
                       ))}
                     </select>
 
-                    <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40" />
-
+                    <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" />
                   </div>
                 </div>
 
                 {/* SHOWTIME */}
 
                 <div>
-                  <label className="mb-2 block text-sm text-white/70">
+                  <label className={mutedLabelClass}>
                     Showtime
                   </label>
 
                   <div className="relative">
-
                     <select
                       value={form.showtimeId}
-                      onChange={handleShowtimeChange}
+                      onChange={
+                        handleShowtimeChange
+                      }
                       disabled={
                         !form.movieId ||
                         loadingShowtimes
                       }
-                      className="w-full appearance-none rounded-xl border border-white/10 bg-[#11151d] px-4 py-3 pr-10 text-sm text-white outline-none transition focus:border-blue-500/50"
+                      className={selectClass}
                     >
                       <option
                         value=""
-                        className="bg-[#11151d] text-white"
+                        className="bg-[#07101c] text-white"
                       >
                         {!form.movieId
                           ? "Select movie first"
@@ -803,7 +776,7 @@ export default function AddManualBookingPage() {
                         <option
                           key={showtime._id}
                           value={showtime._id}
-                          className="bg-[#11151d] text-white"
+                          className="bg-[#07101c] text-white"
                         >
                           {showtime.date} •{" "}
                           {showtime.startTime} • ৳
@@ -812,65 +785,43 @@ export default function AddManualBookingPage() {
                       ))}
                     </select>
 
-                    <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40" />
-
+                    <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" />
                   </div>
                 </div>
-
               </div>
 
               {selectedShowtime && (
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <InfoCard
+                    label="Date"
+                    value={selectedShowtime.date}
+                  />
 
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                    <p className="text-xs text-white/40">
-                      Date
-                    </p>
+                  <InfoCard
+                    label="Time"
+                    value={selectedShowtime.startTime}
+                  />
 
-                    <p className="mt-1 font-medium">
-                      {selectedShowtime.date}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                    <p className="text-xs text-white/40">
-                      Time
-                    </p>
-
-                    <p className="mt-1 font-medium">
-                      {selectedShowtime.startTime}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                    <p className="text-xs text-white/40">
-                      Price / Seat
-                    </p>
-
-                    <p className="mt-1 font-medium">
-                      ৳{seatPrice}
-                    </p>
-                  </div>
-
+                  <InfoCard
+                    label="Price / Seat"
+                    value={`৳${seatPrice}`}
+                  />
                 </div>
               )}
-
             </section>
           )}
 
           {/* FULL HALL */}
 
           {bookingType === "full-hall" && (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+            <section className={sectionClass}>
+              <h2 className={sectionTitleClass}>
                 Full Hall Details
               </h2>
 
               <div className="grid gap-5 md:grid-cols-3">
-
                 <div>
-                  <label className="mb-2 block text-sm text-white/70">
+                  <label className={mutedLabelClass}>
                     Movie Name
                   </label>
 
@@ -880,12 +831,12 @@ export default function AddManualBookingPage() {
                     value={form.movieName}
                     onChange={handleChange}
                     placeholder="Enter movie name"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-blue-500/50"
+                    className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-white/70">
+                  <label className={mutedLabelClass}>
                     Date
                   </label>
 
@@ -894,12 +845,12 @@ export default function AddManualBookingPage() {
                     name="date"
                     value={form.date}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-blue-500/50"
+                    className={dateTimeInputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-white/70">
+                  <label className={mutedLabelClass}>
                     Time
                   </label>
 
@@ -908,95 +859,83 @@ export default function AddManualBookingPage() {
                     name="time"
                     value={form.time}
                     onChange={handleChange}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-blue-500/50"
+                    className={dateTimeInputClass}
                   />
                 </div>
-
               </div>
-
             </section>
           )}
 
           {/* HALL */}
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+          <section className={sectionClass}>
+            <h2 className={sectionTitleClass}>
               Hall
             </h2>
 
             <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-
               <p className="font-semibold">
                 Hall 1
               </p>
 
-              <p className="mt-1 text-sm text-white/50">
+              <p className="mt-1 text-sm text-slate-500">
                 50 seats • A1–E10
               </p>
-
             </div>
-
           </section>
 
           {/* SEATS */}
 
           {bookingType === "seat" &&
             selectedShowtime && (
-              <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
+              <section className={sectionClass}>
                 <div className="mb-5 flex items-center justify-between">
-
                   <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-wider text-white/50">
+                    <h2 className={sectionTitleClass.replace(
+                      "mb-4 ",
+                      ""
+                    )}>
                       Select Seats
                     </h2>
 
-                    <p className="mt-1 text-xs text-white/40">
+                    <p className={smallTextClass}>
                       Maximum 8 seats
                     </p>
                   </div>
 
-                  <div className="rounded-lg bg-blue-500/10 px-3 py-2 text-sm">
+                  <div className="rounded-lg bg-blue-500/10 px-3 py-2 text-sm text-blue-400">
                     {selectedSeats.length}/8
                   </div>
-
                 </div>
 
                 <div className="mb-8 flex justify-center">
-
-                  <div className="w-full max-w-md rounded-full border border-white/10 bg-white/5 py-2 text-center text-xs tracking-[0.3em] text-white/40">
+                  <div className="w-full max-w-md rounded-full border border-white/[0.08] bg-white/[0.03] py-2 text-center text-xs tracking-[0.3em] text-slate-500">
                     SCREEN
                   </div>
-
                 </div>
 
                 {loadingSeats ? (
-                  <div className="py-12 text-center text-sm text-white/40">
+                  <div className="py-12 text-center text-sm text-slate-500">
                     Loading seat availability...
                   </div>
                 ) : (
                   <div className="space-y-3">
-
                     {rows.map((row) => (
                       <div
                         key={row}
                         className="flex items-center gap-2"
                       >
-
-                        <span className="w-5 text-xs text-white/30">
+                        <span className="w-5 text-xs text-slate-600">
                           {row}
                         </span>
 
                         <div className="grid flex-1 grid-cols-10 gap-1.5 sm:gap-2">
-
                           {seats
                             .filter(
                               (seat) =>
                                 seat.row === row
                             )
                             .map((seat) => {
-
                               const selected =
                                 selectedSeats.includes(
                                   seat.id
@@ -1022,154 +961,106 @@ export default function AddManualBookingPage() {
                                       ? "cursor-not-allowed bg-red-500 text-white"
                                       : selected
                                       ? "bg-blue-500 text-white"
-                                      : "border border-white/10 bg-white/5 text-white/50 hover:bg-white/10"
+                                      : "border border-white/[0.08] bg-white/[0.03] text-slate-500 hover:bg-white/[0.06]"
                                   }`}
                                 >
                                   {seat.number}
                                 </button>
                               );
                             })}
-
                         </div>
                       </div>
                     ))}
-
                   </div>
                 )}
 
-                <div className="mt-6 flex flex-wrap gap-4 text-xs text-white/40">
+                <div className="mt-6 flex flex-wrap gap-4 text-xs text-slate-500">
+                  <SeatLegend
+                    className="border border-white/[0.08] bg-white/[0.03]"
+                    label="Available"
+                  />
 
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-sm border border-white/10 bg-white/5" />
-                    Available
-                  </div>
+                  <SeatLegend
+                    className="bg-blue-500"
+                    label="Selected"
+                  />
 
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-sm bg-blue-500" />
-                    Selected
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-sm bg-red-500" />
-                    Occupied
-                  </div>
-
+                  <SeatLegend
+                    className="bg-red-500"
+                    label="Occupied"
+                  />
                 </div>
-
               </section>
             )}
 
           {/* CUSTOMER */}
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+          <section className={sectionClass}>
+            <h2 className={sectionTitleClass}>
               Customer Information
             </h2>
 
             <div className="grid gap-5 md:grid-cols-3">
+              <IconInput
+                icon={<FiUser />}
+                label="Name"
+                name="customerName"
+                value={form.customerName}
+                onChange={handleChange}
+                required
+                placeholder="Customer name"
+              />
 
-              <div>
-                <label className="mb-2 block text-sm text-white/70">
-                  Name
-                </label>
+              <IconInput
+                icon={<FiPhone />}
+                label="Phone"
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={handleChange}
+                required
+                placeholder="Phone number"
+              />
 
-                <div className="relative">
-
-                  <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-
-                  <input
-                    type="text"
-                    name="customerName"
-                    value={form.customerName}
-                    onChange={handleChange}
-                    required
-                    placeholder="Customer name"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm outline-none focus:border-blue-500/50"
-                  />
-
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-white/70">
-                  Phone
-                </label>
-
-                <div className="relative">
-
-                  <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    required
-                    placeholder="Phone number"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm outline-none focus:border-blue-500/50"
-                  />
-
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-white/70">
-                  Email
-                </label>
-
-                <div className="relative">
-
-                  <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    placeholder="Email (optional)"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm outline-none focus:border-blue-500/50"
-                  />
-
-                </div>
-              </div>
-
+              <IconInput
+                icon={<FiMail />}
+                label="Email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Email (optional)"
+              />
             </div>
-
           </section>
 
           {/* PAYMENT */}
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+          <section className={sectionClass}>
+            <h2 className={sectionTitleClass}>
               Payment
             </h2>
 
             <div className="grid gap-5 md:grid-cols-2">
-
               <div>
-                <label className="mb-2 block text-sm text-white/70">
+                <label className={mutedLabelClass}>
                   Payment Method
                 </label>
 
                 <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
-
                   <p className="font-medium">
                     Cash
                   </p>
 
-                  <p className="mt-1 text-xs text-white/40">
+                  <p className="mt-1 text-xs text-slate-500">
                     Manual booking only
                   </p>
-
                 </div>
               </div>
 
               {bookingType === "full-hall" && (
                 <div>
-
-                  <label className="mb-2 block text-sm text-white/70">
+                  <label className={mutedLabelClass}>
                     Amount
                   </label>
 
@@ -1180,33 +1071,28 @@ export default function AddManualBookingPage() {
                     onChange={handleChange}
                     min="0"
                     step="1"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-blue-500/50"
+                    className={inputClass}
                   />
 
-                  <p className="mt-2 text-xs text-white/40">
+                  <p className="mt-2 text-xs text-slate-500">
                     Default amount: ৳2500
                   </p>
-
                 </div>
               )}
-
             </div>
-
           </section>
 
           {/* SUMMARY */}
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
+          <section className={sectionClass}>
+            <h2 className={sectionTitleClass}>
               Booking Summary
             </h2>
 
             {bookingType === "seat" ? (
               <div className="space-y-3">
-
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/50">
+                  <span className="text-slate-500">
                     Seats
                   </span>
 
@@ -1218,7 +1104,7 @@ export default function AddManualBookingPage() {
                 </div>
 
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/50">
+                  <span className="text-slate-500">
                     Price / seat
                   </span>
 
@@ -1227,10 +1113,8 @@ export default function AddManualBookingPage() {
                   </span>
                 </div>
 
-                <div className="border-t border-white/10 pt-3">
-
+                <div className="border-t border-white/[0.08] pt-3">
                   <div className="flex justify-between">
-
                     <span className="font-semibold">
                       Total
                     </span>
@@ -1238,15 +1122,11 @@ export default function AddManualBookingPage() {
                     <span className="text-xl font-bold">
                       ৳{seatBookingTotal}
                     </span>
-
                   </div>
-
                 </div>
-
               </div>
             ) : (
               <div className="flex justify-between">
-
                 <span className="font-semibold">
                   Full Hall Total
                 </span>
@@ -1254,10 +1134,8 @@ export default function AddManualBookingPage() {
                 <span className="text-xl font-bold">
                   ৳{Number(form.amount || 2500)}
                 </span>
-
               </div>
             )}
-
           </section>
 
           {/* SUBMIT */}
@@ -1265,7 +1143,7 @@ export default function AddManualBookingPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-4 font-semibold transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-4 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
               <>
@@ -1279,8 +1157,110 @@ export default function AddManualBookingPage() {
               </>
             )}
           </button>
-
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ==================================================
+// SMALL UI COMPONENTS
+// ==================================================
+
+function BookingTypeButton({
+  active,
+  onClick,
+  title,
+  description,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border p-4 text-left transition ${
+        active
+          ? "border-blue-500/50 bg-blue-500/10"
+          : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <FiFilm
+          className={
+            active
+              ? "text-blue-400"
+              : "text-slate-400"
+          }
+        />
+
+        <div>
+          <p className="font-semibold">
+            {title}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {description}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function InfoCard({ label, value }) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+      <p className="text-xs text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-1 font-medium">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SeatLegend({ className, label }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={`h-3 w-3 rounded-sm ${className}`}
+      />
+      {label}
+    </div>
+  );
+}
+
+function IconInput({
+  icon,
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  required = false,
+  placeholder,
+}) {
+  return (
+    <div>
+      <label className={mutedLabelClass}>
+        {label}
+      </label>
+
+      <div className="relative">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+          {icon}
+        </span>
+
+        <input
+          type={type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          required={required}
+          placeholder={placeholder}
+          className={`${inputClass} pl-11`}
+        />
       </div>
     </div>
   );

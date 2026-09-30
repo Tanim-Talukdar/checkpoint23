@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   FiSearch,
   FiStar,
@@ -228,33 +227,12 @@ export default function MoviePage() {
               BACKGROUND
           ================================================== */}
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={featuredMovie._id}
-              initial={{
-                opacity: 0,
-                scale: 1.08,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 1.03,
-              }}
-              transition={{
-                duration: 1,
-                ease: "easeOut",
-              }}
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${featuredMovie.backdrop || featuredMovie.poster})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-          </AnimatePresence>
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${featuredMovie.backdrop || featuredMovie.poster})`,
+            }}
+          />
 
           {/* Dark overlay */}
 
@@ -282,132 +260,112 @@ export default function MoviePage() {
                   LEFT
               ================================================== */}
 
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={featuredMovie._id}
-                  initial={{
-                    opacity: 0,
-                    y: 30,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    y: -20,
-                  }}
-                  transition={{
-                    duration: 0.6,
-                  }}
-                  className="max-w-3xl"
-                >
-                  {/* Label */}
+              <div className="max-w-3xl">
+                {/* Label */}
 
-                  <div className="mb-6 flex items-center gap-3">
-                    <span className="h-px w-10 bg-blue-500" />
+                <div className="mb-6 flex items-center gap-3">
+                  <span className="h-px w-10 bg-blue-500" />
 
-                    <span className="text-xs font-semibold uppercase tracking-[0.35em] text-blue-400">
-                      The Checkpoint Cinema
+                  <span className="text-xs font-semibold uppercase tracking-[0.35em] text-blue-400">
+                    The Checkpoint Cinema
+                  </span>
+                </div>
+
+                {/* Now showing */}
+
+                <p className="mb-3 text-xs font-medium tracking-[0.3em] text-slate-500">
+                  NOW SHOWING
+                </p>
+
+                {/* Title */}
+
+                <h1 className="max-w-3xl text-6xl font-black leading-[0.88] tracking-[-0.06em] text-white sm:text-7xl lg:text-[92px]">
+                  {featuredMovie.title}
+                </h1>
+
+                {/* Description */}
+
+                <p className="mt-7 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
+                  {featuredMovie.description}
+                </p>
+
+                {/* Meta */}
+
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  {/* Rating */}
+
+                  <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 backdrop-blur-xl">
+                    <FiStar className="fill-current text-yellow-400" />
+
+                    <span className="text-sm font-semibold">
+                      {featuredMovie.rating}
                     </span>
                   </div>
 
-                  {/* Now showing */}
+                  {/* Genres */}
 
-                  <p className="mb-3 text-xs font-medium tracking-[0.3em] text-slate-500">
-                    NOW SHOWING
-                  </p>
-
-                  {/* Title */}
-
-                  <h1 className="max-w-3xl text-6xl font-black leading-[0.88] tracking-[-0.06em] text-white sm:text-7xl lg:text-[92px]">
-                    {featuredMovie.title}
-                  </h1>
-
-                  {/* Description */}
-
-                  <p className="mt-7 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                    {featuredMovie.description}
-                  </p>
-
-                  {/* Meta */}
-
-                  <div className="mt-7 flex flex-wrap items-center gap-3">
-                    {/* Rating */}
-
-                    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 backdrop-blur-xl">
-                      <FiStar className="fill-current text-yellow-400" />
-
-                      <span className="text-sm font-semibold">
-                        {featuredMovie.rating}
-                      </span>
-                    </div>
-
-                    {/* Genres */}
-
-                    {featuredMovie.genres?.map((genre) => (
-                      <span
-                        key={genre}
-                        className="rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 text-sm text-slate-200 backdrop-blur-xl"
-                      >
-                        {genre}
-                      </span>
-                    ))}
-
-                    {/* Duration */}
-
-                    {featuredMovie.duration > 0 && (
-                      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 text-sm text-slate-200 backdrop-blur-xl">
-                        <FiClock size={14} />
-
-                        {formatDuration(
-                          featuredMovie.duration
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* =================================================
-                      BUTTONS
-                  ================================================== */}
-
-                  <div className="mt-9 flex flex-wrap gap-4">
-                    {/* Book */}
-
-                    <Link
-                      href={`/movie/${featuredMovie._id}`}
-                      className="group flex items-center gap-3 rounded-xl bg-blue-600 px-7 py-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_35px_rgba(37,99,235,0.35)]"
+                  {featuredMovie.genres?.map((genre) => (
+                    <span
+                      key={genre}
+                      className="rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 text-sm text-slate-200 backdrop-blur-xl"
                     >
-                      Book Now
+                      {genre}
+                    </span>
+                  ))}
 
-                      <FiArrowUpRight
-                        size={18}
-                        className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                      />
-                    </Link>
+                  {/* Duration */}
 
-                    {/* Trailer */}
+                  {featuredMovie.duration > 0 && (
+                    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 text-sm text-slate-200 backdrop-blur-xl">
+                      <FiClock size={14} />
 
-                    {featuredMovie.trailer && (
-                      <a
-                        href={featuredMovie.trailer}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] px-7 py-4 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10"
-                      >
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#050A14]">
-                          <FiPlay
-                            size={12}
-                            fill="currentColor"
-                          />
-                        </span>
+                      {formatDuration(
+                        featuredMovie.duration
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                        Watch Trailer
-                      </a>
-                    )}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
+                {/* =================================================
+                    BUTTONS
+                ================================================== */}
+
+                <div className="mt-9 flex flex-wrap gap-4">
+                  {/* Book */}
+
+                  <Link
+                    href={`/movie/${featuredMovie._id}`}
+                    className="group flex items-center gap-3 rounded-xl bg-blue-600 px-7 py-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-300 hover:bg-blue-500 hover:shadow-[0_0_35px_rgba(37,99,235,0.35)]"
+                  >
+                    See Details
+
+                    <FiArrowUpRight
+                      size={18}
+                      className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                    />
+                  </Link>
+
+                  {/* Trailer */}
+
+                  {featuredMovie.trailer && (
+                    <a
+                      href={featuredMovie.trailer}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] px-7 py-4 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#050A14]">
+                        <FiPlay
+                          size={12}
+                          fill="currentColor"
+                        />
+                      </span>
+
+                      Watch Trailer
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -482,7 +440,7 @@ export default function MoviePage() {
 
       {/* =====================================================
           MOVIES SECTION
-      ====================================================== */}
+      ===================================================== */}
 
       <section
         id="movies"
@@ -532,7 +490,7 @@ export default function MoviePage() {
               CATEGORY FILTER
           ================================================== */}
 
-            <div className="mt-10 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-10 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((item) => {
               const active = category === item;
 
@@ -587,101 +545,88 @@ export default function MoviePage() {
 
           {filteredMovies.length > 0 ? (
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {filteredMovies.map(
-                (movie, index) => (
-                  <motion.article
-                    key={movie._id}
-                    initial={{
-                      opacity: 0,
-                      y: 20,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    transition={{
-                      duration: 0.4,
-                      delay: index * 0.05,
-                    }}
-                    className="group"
-                  >
-                    {/* Poster */}
+              {filteredMovies.map((movie) => (
+                <article
+                  key={movie._id}
+                  className="group"
+                >
+                  {/* Poster */}
 
-                    <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03]">
-                      {movie.poster ? (
-                        <img
-                          src={movie.poster}
-                          alt={movie.title}
-                          loading="lazy"
-                          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03]">
+                    {movie.poster ? (
+                      <img
+                        src={movie.poster}
+                        alt={movie.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-white/[0.03]">
+                        <span className="text-xs text-slate-600">
+                          No poster
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Overlay */}
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#050A14] via-transparent to-transparent opacity-60" />
+
+                    {/* Rating */}
+
+                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-white/10 bg-[#050A14]/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-md">
+                      <FiStar
+                        className="fill-current text-blue-400"
+                        size={12}
+                      />
+
+                      {movie.rating}
+                    </div>
+
+                    {/* Hover */}
+
+                    <div className="absolute inset-x-3 bottom-3 translate-y-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                      <Link
+                        href={`/movie/${movie._id}`}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold shadow-xl shadow-blue-600/20 transition hover:bg-blue-500"
+                      >
+                        View Movie
+
+                        <FiArrowUpRight
+                          size={14}
                         />
-                      ) : (
-                        <div className="flex h-full items-center justify-center bg-white/[0.03]">
-                          <span className="text-xs text-slate-600">
-                            No poster
-                          </span>
-                        </div>
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Details */}
+
+                  <div className="mt-4">
+                    <h3 className="truncate text-sm font-bold text-white">
+                      {movie.title}
+                    </h3>
+
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="truncate text-xs text-slate-600">
+                        {movie.genres
+                          ?.slice(0, 2)
+                          .join(" • ")}
+                      </p>
+
+                      {movie.duration > 0 && (
+                        <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-600">
+                          <FiClock size={11} />
+
+                          {formatDuration(
+                            movie.duration
+                          )}
+                        </span>
                       )}
-
-                      {/* Overlay */}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#050A14] via-transparent to-transparent opacity-60" />
-
-                      {/* Rating */}
-
-                      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-white/10 bg-[#050A14]/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-md">
-                        <FiStar
-                          className="fill-current text-blue-400"
-                          size={12}
-                        />
-
-                        {movie.rating}
-                      </div>
-
-                      {/* Hover */}
-
-                      <div className="absolute inset-x-3 bottom-3 translate-y-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                        <Link
-                          href={`/movie/${movie._id}`}
-                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold shadow-xl shadow-blue-600/20 transition hover:bg-blue-500"
-                        >
-                          View Movie
-
-                          <FiArrowUpRight
-                            size={14}
-                          />
-                        </Link>
-                      </div>
                     </div>
-
-                    {/* Details */}
-
-                    <div className="mt-4">
-                      <h3 className="truncate text-sm font-bold text-white">
-                        {movie.title}
-                      </h3>
-
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <p className="truncate text-xs text-slate-600">
-                          {movie.genres
-                            ?.slice(0, 2)
-                            .join(" • ")}
-                        </p>
-
-                        {movie.duration > 0 && (
-                          <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-600">
-                            <FiClock size={11} />
-
-                            {formatDuration(
-                              movie.duration
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </motion.article>
-                )
-              )}
+                  </div>
+                </article>
+              ))}
             </div>
           ) : (
             /* =================================================
