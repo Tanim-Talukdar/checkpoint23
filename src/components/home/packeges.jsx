@@ -33,7 +33,7 @@ export default function Packages() {
             src={PACKAGE_IMAGE}
             alt="The Checkpoint fitness packages and membership pricing"
             width={1066}
-            height={1419}
+            height={1507}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 900px"
             quality={75}
             loading="lazy"
@@ -84,7 +84,7 @@ export default function Packages() {
               src={PACKAGE_IMAGE}
               alt="The Checkpoint fitness packages"
               width={1066}
-              height={1419}
+              height={1507}
               sizes="90vw"
               quality={80}
               className="block h-auto max-h-[82vh] w-auto max-w-full object-contain"

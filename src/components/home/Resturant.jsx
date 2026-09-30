@@ -108,8 +108,8 @@ export default function Restaurant() {
             <Image
               src={selectedMenu.src}
               alt={selectedMenu.title}
-              width={1200}
-              height={1500}
+              width={1024}
+              height={1280}
               sizes="94vw"
               quality={75}
               priority

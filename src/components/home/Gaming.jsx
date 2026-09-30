@@ -132,8 +132,8 @@ export default function Gaming() {
             <Image
               src={selectedImage.src}
               alt={selectedImage.alt}
-              width={1600}
-              height={2000}
+              width={1055}
+              height={1491}
               sizes="94vw"
               quality={75}
               priority
