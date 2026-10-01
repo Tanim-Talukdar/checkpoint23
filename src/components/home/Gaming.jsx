@@ -126,7 +126,7 @@ export default function Gaming() {
 
           {/* IMAGE CONTAINER */}
           <div
-            className="relative flex max-h-[94dvh] max-w-6xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#07101D]"
+            className="relative max-h-[94dvh] w-[94vw] max-w-6xl overflow-auto rounded-xl border border-white/10 bg-[#07101D]"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -137,13 +137,7 @@ export default function Gaming() {
               sizes="94vw"
               quality={75}
               priority
-              className="block h-auto w-auto max-h-[94dvh] max-w-[94vw] object-contain"
-              style={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "94vw",
-                maxHeight: "94dvh",
-              }}
+              className="block h-auto w-full"
             />
           </div>
         </div>

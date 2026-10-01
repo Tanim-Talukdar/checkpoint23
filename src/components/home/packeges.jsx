@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from "next/image";
@@ -27,17 +26,17 @@ export default function Packages() {
         <button
           type="button"
           onClick={() => setShowPackage(true)}
-          className="group relative mx-auto block max-w-full overflow-hidden rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl"
+          className="group relative mx-auto block w-full max-w-[1066px] overflow-hidden rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl"
         >
           <Image
             src={PACKAGE_IMAGE}
             alt="The Checkpoint fitness packages and membership pricing"
             width={1066}
             height={1507}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 900px"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1066px"
             quality={75}
             loading="lazy"
-            className="mx-auto block h-auto w-full max-w-[1066px] object-contain sm:transition-transform sm:duration-500 sm:group-hover:scale-[1.015]"
+            className="mx-auto block h-auto w-full max-w-none sm:transition-transform sm:duration-500 sm:group-hover:scale-[1.015]"
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-[#030712]/70 to-transparent" />
@@ -62,36 +61,38 @@ export default function Packages() {
         </button>
       </div>
 
-      {showPackage && (
-        <div
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-3 sm:p-6"
-          onClick={() => setShowPackage(false)}
-        >
-          <button
-            type="button"
-            onClick={() => setShowPackage(false)}
-            aria-label="Close package"
-            className="absolute right-4 top-4 z-[1000] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white transition hover:bg-blue-600"
-          >
-            <FiX size={20} />
-          </button>
+{showPackage && (
+  <div
+    className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-3 sm:p-6"
+    onClick={() => setShowPackage(false)}
+  >
+    <button
+      type="button"
+      onClick={() => setShowPackage(false)}
+      aria-label="Close package"
+      className="absolute right-4 top-4 z-[1000] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white transition hover:bg-blue-600"
+    >
+      <FiX size={20} />
+    </button>
 
-          <div
-            className="max-h-[82vh] max-w-[90vw] overflow-auto rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl sm:max-w-4xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
-              src={PACKAGE_IMAGE}
-              alt="The Checkpoint fitness packages"
-              width={1066}
-              height={1507}
-              sizes="90vw"
-              quality={80}
-              className="block h-auto max-h-[82vh] w-auto max-w-full object-contain"
-            />
-          </div>
-        </div>
-      )}
+    <div
+      className="max-h-[90vh] w-[90vw] max-w-4xl overflow-auto rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Image
+        src={PACKAGE_IMAGE}
+        alt="The Checkpoint fitness packages"
+        width={1066}
+        height={1507}
+        sizes="90vw"
+        quality={80}
+        className="block h-auto w-full"
+      />
+    </div>
+  </div>
+)}
+
+
     </section>
   );
 }

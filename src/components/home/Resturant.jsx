@@ -102,7 +102,7 @@ export default function Restaurant() {
           </button>
 
           <div
-            className="relative flex max-h-[94dvh] w-full max-w-5xl items-center justify-center overflow-auto rounded-xl border border-white/10 bg-[#030712]"
+            className="relative max-h-[94dvh] w-[94vw] max-w-5xl overflow-auto rounded-xl border border-white/10 bg-[#030712]"
             onClick={(e) => e.stopPropagation()}
           >
             <Image
@@ -113,13 +113,7 @@ export default function Restaurant() {
               sizes="94vw"
               quality={75}
               priority
-              className="block h-auto max-h-[94dvh] w-auto max-w-full object-contain"
-              style={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "100%",
-                maxHeight: "94dvh",
-              }}
+              className="block h-auto w-full"
             />
           </div>
         </div>
@@ -127,4 +121,3 @@ export default function Restaurant() {
     </section>
   );
 }
-
