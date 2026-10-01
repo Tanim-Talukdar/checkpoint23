@@ -14,7 +14,7 @@ export default function Packages() {
     <section id="packages" className="bg-[#030712] text-white">
       <div className="h-px bg-blue-500/25" />
 
-      <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:px-10">
+      <div className="mx-auto max-w-7xl px-5 py-1 sm:px-8 sm:py-28 lg:px-10">
         {/* HEADER */}
         <div className="mt-12 flex items-end justify-between sm:mt-16">
           <div>

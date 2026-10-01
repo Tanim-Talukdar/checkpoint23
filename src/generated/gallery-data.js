@@ -20,7 +20,7 @@ const gallerySections = [
         ]
       },
       {
-        "folder": "gym&steamBath",
+        "folder": "gym & steam Bath",
         "images": [
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790708319/Checkpoint/gym-steamBath/01.webp",
           "https://res.cloudinary.com/qds5td8c/image/upload/v1790708321/Checkpoint/gym-steamBath/02.webp",
