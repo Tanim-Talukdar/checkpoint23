@@ -35,15 +35,16 @@ const links = [
     href: "/#gallery",
     icon:  FiGrid,
   },
-  {
-    name: "Contact",
-    href: "/#contact",
-    icon:  FiMapPin,
-  },
+
   {
     name: "Movie",
     href: "/movie",
     icon: FiFilm,
+  },
+  {
+    name: "Contact",
+    href: "/#contact",
+    icon:  FiMapPin,
   },
 ];
 

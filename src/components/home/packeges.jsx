@@ -15,11 +15,23 @@ export default function Packages() {
       <div className="h-px bg-blue-500/25" />
 
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:px-10">
-        <div className="mb-12 flex items-center gap-3 sm:mb-16">
-          <span className="h-px w-8 bg-blue-500" />
+        {/* HEADER */}
+        <div className="mt-12 flex items-end justify-between sm:mt-16">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-blue-400">
+              Fitness Activity Menu
+            </p>
 
-          <span className="text-xl font-black uppercase tracking-[0.2em] text-blue-400 sm:text-2xl">
-            The Checkpoint Fitness
+            <h2
+              id="gaming-title"
+              className="mt-1 mb-10 text-2xl font-black tracking-tight sm:text-3xl"
+            >
+              Gym, Swimming Pool, and Playground Prices
+            </h2>
+          </div>
+
+          <span className="hidden text-[9px] uppercase tracking-[0.2em] text-white/30 sm:block">
+            Tap to view
           </span>
         </div>
 
