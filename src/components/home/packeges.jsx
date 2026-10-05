@@ -1,6 +1,8 @@
+
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { FiArrowUpRight, FiX } from "react-icons/fi";
 
@@ -35,6 +37,7 @@ export default function Packages() {
           </span>
         </div>
 
+        {/* PACKAGE IMAGE */}
         <button
           type="button"
           onClick={() => setShowPackage(true)}
@@ -71,40 +74,53 @@ export default function Packages() {
             <FiArrowUpRight size={18} />
           </div>
         </button>
+
+        {/* BOOK BUTTON */}
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/booking"
+            className="group inline-flex items-center gap-2 rounded-full border border-blue-500/40 bg-blue-600 px-7 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-lg shadow-blue-600/10 transition hover:border-blue-400 hover:bg-blue-500 active:scale-[0.98]"
+          >
+            Book Now
+            <FiArrowUpRight
+              size={15}
+              className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+            />
+          </Link>
+        </div>
       </div>
 
-{showPackage && (
-  <div
-    className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-3 sm:p-6"
-    onClick={() => setShowPackage(false)}
-  >
-    <button
-      type="button"
-      onClick={() => setShowPackage(false)}
-      aria-label="Close package"
-      className="absolute right-4 top-4 z-[1000] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white transition hover:bg-blue-600"
-    >
-      <FiX size={20} />
-    </button>
+      {/* PACKAGE MODAL */}
+      {showPackage && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-3 sm:p-6"
+          onClick={() => setShowPackage(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setShowPackage(false)}
+            aria-label="Close package"
+            className="absolute right-4 top-4 z-[1000] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white transition hover:bg-blue-600"
+          >
+            <FiX size={20} />
+          </button>
 
-    <div
-      className="max-h-[90vh] w-[90vw] max-w-4xl overflow-auto rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <Image
-        src={PACKAGE_IMAGE}
-        alt="The Checkpoint fitness packages"
-        width={1066}
-        height={1507}
-        sizes="90vw"
-        quality={80}
-        className="block h-auto w-full"
-      />
-    </div>
-  </div>
-)}
-
-
+          <div
+            className="max-h-[90vh] w-[90vw] max-w-4xl overflow-auto rounded-2xl border border-white/10 bg-[#07101D] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={PACKAGE_IMAGE}
+              alt="The Checkpoint fitness packages"
+              width={1066}
+              height={1507}
+              sizes="90vw"
+              quality={80}
+              className="block h-auto w-full"
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
