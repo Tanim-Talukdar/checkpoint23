@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -8,6 +9,8 @@ import {
   FiArrowRight,
   FiCalendar,
   FiCheck,
+  FiChevronLeft,
+  FiChevronRight,
   FiClock,
   FiFilm,
   FiGrid,
@@ -158,7 +161,8 @@ const SERVICES = {
     {
       id: "movie-ticket",
       title: "Private Movie Viewing",
-      description: "Private cinema viewing with your chosen movie.",
+      description:
+        "Private cinema viewing with your chosen movie.",
       price: 250,
       unit: "ticket",
       duration: 120,
@@ -177,18 +181,6 @@ const MOVIES = [
   "Movie 04",
 ];
 
-/*
-  FRONTEND DEMO AVAILABILITY
-
-  This is only for displaying the UI before the backend exists.
-
-  status:
-    "available" = selectable
-    "full"      = disabled
-
-  remaining:
-    remaining spots/seats for capacity-based services
-*/
 const DEMO_AVAILABILITY = {
   default: {
     "11:00 AM": { status: "available", remaining: 9 },
@@ -259,7 +251,8 @@ const DEMO_AVAILABILITY = {
   },
 };
 
-const formatPrice = (price) => `৳${price.toLocaleString("en-BD")}`;
+const formatPrice = (price) =>
+  `৳${price.toLocaleString("en-BD")}`;
 
 const getService = (id) =>
   Object.values(SERVICES)
@@ -313,7 +306,116 @@ function getAvailability(service, time) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* DATE HELPERS                                                               */
+/* -------------------------------------------------------------------------- */
+
+function formatDateValue(year, month, day) {
+  return [
+    year,
+    String(month + 1).padStart(2, "0"),
+    String(day).padStart(2, "0"),
+  ].join("-");
+}
+
+function parseDateValue(value) {
+  if (!value) return null;
+
+  const [year, month, day] = value
+    .split("-")
+    .map(Number);
+
+  if (!year || !month || !day) return null;
+
+  return {
+    year,
+    month: month - 1,
+    day,
+  };
+}
+
+function isSameDate(value, year, month, day) {
+  const parsed = parseDateValue(value);
+
+  return (
+    parsed &&
+    parsed.year === year &&
+    parsed.month === month &&
+    parsed.day === day
+  );
+}
+
+function isToday(year, month, day) {
+  const today = new Date();
+
+  return (
+    today.getFullYear() === year &&
+    today.getMonth() === month &&
+    today.getDate() === day
+  );
+}
+
+function getCalendarDays(year, month) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(
+    year,
+    month + 1,
+    0
+  ).getDate();
+
+  const daysInPreviousMonth = new Date(
+    year,
+    month,
+    0
+  ).getDate();
+
+  const days = [];
+
+  /*
+    Previous month's trailing days.
+    Sunday = 0, Monday = 1, etc.
+  */
+  for (let i = firstDay - 1; i >= 0; i--) {
+    days.push({
+      day: daysInPreviousMonth - i,
+      monthOffset: -1,
+    });
+  }
+
+  /*
+    Current month.
+  */
+  for (let day = 1; day <= daysInMonth; day++) {
+    days.push({
+      day,
+      monthOffset: 0,
+    });
+  }
+
+  /*
+    Next month's leading days.
+  */
+  let nextDay = 1;
+
+  while (days.length < 42) {
+    days.push({
+      day: nextDay,
+      monthOffset: 1,
+    });
+
+    nextDay++;
+  }
+
+  return days;
+}
+
+/* -------------------------------------------------------------------------- */
+/* MAIN COMPONENT                                                             */
+/* -------------------------------------------------------------------------- */
+
 export default function BookingPage() {
+  const today = new Date();
+
   const [facility, setFacility] = useState("fitness");
   const [serviceId, setServiceId] = useState("gym-day");
   const [date, setDate] = useState("");
@@ -322,6 +424,14 @@ export default function BookingPage() {
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
+
+  const [calendarMonth, setCalendarMonth] = useState(
+    today.getMonth()
+  );
+
+  const [calendarYear, setCalendarYear] = useState(
+    today.getFullYear()
+  );
 
   const serviceRef = useRef(null);
   const dateRef = useRef(null);
@@ -367,14 +477,39 @@ export default function BookingPage() {
     (!isMovie || movie);
 
   const cartTotal = useMemo(
-    () => cart.reduce((total, item) => total + item.total, 0),
+    () =>
+      cart.reduce(
+        (total, item) => total + item.total,
+        0
+      ),
     [cart]
   );
 
   const cartCount = useMemo(
-    () => cart.reduce((total, item) => total + item.quantity, 0),
+    () =>
+      cart.reduce(
+        (total, item) => total + item.quantity,
+        0
+      ),
     [cart]
   );
+
+  const calendarDays = useMemo(
+    () =>
+      getCalendarDays(
+        calendarYear,
+        calendarMonth
+      ),
+    [calendarYear, calendarMonth]
+  );
+
+  const calendarMonthName = new Date(
+    calendarYear,
+    calendarMonth,
+    1
+  ).toLocaleString("en-US", {
+    month: "long",
+  });
 
   function scrollToSection(ref) {
     setTimeout(() => {
@@ -419,6 +554,77 @@ export default function BookingPage() {
     }
   }
 
+  function handleCalendarDateClick(
+    day,
+    monthOffset
+  ) {
+    const selectedMonth = new Date(
+      calendarYear,
+      calendarMonth + monthOffset,
+      1
+    );
+
+    const selectedYear =
+      selectedMonth.getFullYear();
+
+    const selectedMonthIndex =
+      selectedMonth.getMonth();
+
+    const value = formatDateValue(
+      selectedYear,
+      selectedMonthIndex,
+      day
+    );
+
+    setDate(value);
+    setSlot("");
+
+    if (monthOffset !== 0) {
+      setCalendarYear(selectedYear);
+      setCalendarMonth(selectedMonthIndex);
+    }
+
+    if (selectedService?.membership) {
+      scrollToSection(quantityRef);
+    } else {
+      setTimeout(() => {
+        timeRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 150);
+    }
+  }
+
+  function goToPreviousMonth() {
+    setCalendarMonth((currentMonth) => {
+      if (currentMonth === 0) {
+        setCalendarYear((currentYear) => currentYear - 1);
+        return 11;
+      }
+
+      return currentMonth - 1;
+    });
+  }
+
+  function goToNextMonth() {
+    setCalendarMonth((currentMonth) => {
+      if (currentMonth === 11) {
+        setCalendarYear((currentYear) => currentYear + 1);
+        return 0;
+      }
+
+      return currentMonth + 1;
+    });
+  }
+
+  function goToCurrentMonth() {
+    const current = new Date();
+
+    setCalendarYear(current.getFullYear());
+    setCalendarMonth(current.getMonth());
+  }
+
   function handleSlotChange(time) {
     setSlot(time);
     scrollToSection(quantityRef);
@@ -427,26 +633,32 @@ export default function BookingPage() {
   function increaseQuantity() {
     if (!selectedService) return;
 
-    const max = selectedService.capacity || Infinity;
+    const max =
+      selectedService.capacity || Infinity;
 
-    setQuantity((current) => Math.min(current + 1, max));
+    setQuantity((current) =>
+      Math.min(current + 1, max)
+    );
   }
 
   function decreaseQuantity() {
     if (!selectedService) return;
 
-    const minimum = selectedService.minimum || 1;
+    const minimum =
+      selectedService.minimum || 1;
 
-    setQuantity((current) => Math.max(current - 1, minimum));
+    setQuantity((current) =>
+      Math.max(current - 1, minimum)
+    );
   }
 
   function addToBooking() {
     if (!selectedService || !canAdd) return;
 
     const newItem = {
-      id: `${selectedService.id}-${date}-${slot || "membership"}-${
-        movie || "none"
-      }-${Date.now()}`,
+      id: `${selectedService.id}-${date}-${
+        slot || "membership"
+      }-${movie || "none"}-${Date.now()}`,
       serviceId: selectedService.id,
       title: selectedService.title,
       price: selectedService.price,
@@ -454,15 +666,24 @@ export default function BookingPage() {
       date,
       slot: isMembership ? null : slot,
       movie: isMovie ? movie : null,
-      total: selectedService.price * quantity,
+      total:
+        selectedService.price * quantity,
     };
 
-    setCart((current) => [...current, newItem]);
+    setCart((current) => [
+      ...current,
+      newItem,
+    ]);
+
     setCartOpen(true);
   }
 
   function removeFromCart(id) {
-    setCart((current) => current.filter((item) => item.id !== id));
+    setCart((current) =>
+      current.filter(
+        (item) => item.id !== id
+      )
+    );
   }
 
   return (
@@ -530,16 +751,21 @@ export default function BookingPage() {
                 </h2>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {FACILITIES.map((item) => {
                   const Icon = item.icon;
-                  const active = facility === item.id;
+                  const active =
+                    facility === item.id;
 
                   return (
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => handleFacilityChange(item.id)}
+                      onClick={() =>
+                        handleFacilityChange(
+                          item.id
+                        )
+                      }
                       className={`group rounded-2xl border p-5 text-left transition ${
                         active
                           ? "border-blue-500/60 bg-blue-500/10"
@@ -596,123 +822,242 @@ export default function BookingPage() {
                 </h2>
               </div>
 
-              {facility === "fitness" ? (
-                <div className="space-y-3">
-                  {/* DAY PASSES */}
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {services
-                      .filter((service) => !service.membership)
-                      .map((service) => {
-                        const active = serviceId === service.id;
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {services.map((service) => {
+                  const active =
+                    serviceId === service.id;
 
-                        return (
-                          <ServiceCard
-                            key={service.id}
-                            service={service}
-                            active={active}
-                            onClick={() =>
-                              handleServiceChange(service.id)
-                            }
-                          />
-                        );
-                      })}
-                  </div>
-
-                  {/* MONTHLY MEMBERSHIPS */}
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {services
-                      .filter((service) => service.membership)
-                      .map((service) => {
-                        const active = serviceId === service.id;
-
-                        return (
-                          <ServiceCard
-                            key={service.id}
-                            service={service}
-                            active={active}
-                            onClick={() =>
-                              handleServiceChange(service.id)
-                            }
-                          />
-                        );
-                      })}
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {services.map((service) => {
-                    const active = serviceId === service.id;
-
-                    return (
-                      <ServiceCard
-                        key={service.id}
-                        service={service}
-                        active={active}
-                        onClick={() =>
-                          handleServiceChange(service.id)
-                        }
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* DATE */}
-            <div
-              ref={dateRef}
-              className="scroll-mt-28 rounded-3xl border border-white/10 bg-[#07101c] p-5 sm:scroll-mt-32 sm:p-7"
-            >
-              <div className="mb-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
-                  03
-                </p>
-
-                <h2 className="mt-2 text-2xl font-semibold">
-                  Choose your date
-                </h2>
-              </div>
-
-              <div className="relative">
-                <FiCalendar
-                  className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-white/70"
-                  size={19}
-                />
-
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(event) =>
-                    handleDateChange(event.target.value)
-                  }
-                  className="h-14 w-full cursor-pointer rounded-2xl border border-white/10 bg-[#030712] pl-11 pr-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-blue-500/60"
-                />
+                  return (
+                    <ServiceCard
+                      key={service.id}
+                      service={service}
+                      active={active}
+                      onClick={() =>
+                        handleServiceChange(
+                          service.id
+                        )
+                      }
+                    />
+                  );
+                })}
               </div>
             </div>
 
-            {/* TIME SLOTS */}
-            {!isMembership && (
+            {/* DATE + TIME */}
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+              {/* CALENDAR */}
               <div
-                ref={timeRef}
+                ref={dateRef}
                 className="scroll-mt-28 rounded-3xl border border-white/10 bg-[#07101c] p-5 sm:scroll-mt-32 sm:p-7"
               >
                 <div className="mb-6">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
-                    04
+                    03
                   </p>
 
-                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h2 className="text-2xl font-semibold">
-                        Choose your time
-                      </h2>
+                  <h2 className="mt-2 text-2xl font-semibold">
+                    Choose your date
+                  </h2>
 
-                      <p className="mt-2 text-sm text-white/40">
-                        Select an available time slot.
+                  <p className="mt-2 text-sm text-white/40">
+                    Select your preferred date.
+                  </p>
+                </div>
+
+                {/* CALENDAR */}
+                <div className="rounded-2xl border border-white/10 bg-[#030712] p-4 sm:p-5">
+                  {/* CALENDAR HEADER */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={goToPreviousMonth}
+                      aria-label="Previous month"
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/50 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <FiChevronLeft size={18} />
+                    </button>
+
+                    <div className="text-center">
+                      <p className="text-base font-semibold">
+                        {calendarMonthName}{" "}
+                        {calendarYear}
                       </p>
+
+                      <button
+                        type="button"
+                        onClick={goToCurrentMonth}
+                        className="mt-1 text-[10px] font-medium uppercase tracking-wider text-blue-400 transition hover:text-blue-300"
+                      >
+                        Today
+                      </button>
                     </div>
 
-                    <div className="flex flex-wrap gap-3 text-[11px] text-white/40">
+                    <button
+                      type="button"
+                      onClick={goToNextMonth}
+                      aria-label="Next month"
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/50 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <FiChevronRight size={18} />
+                    </button>
+                  </div>
+
+                  {/* WEEKDAYS */}
+                  <div className="mt-6 grid grid-cols-7">
+                    {[
+                      "Sun",
+                      "Mon",
+                      "Tue",
+                      "Wed",
+                      "Thu",
+                      "Fri",
+                      "Sat",
+                    ].map((day) => (
+                      <div
+                        key={day}
+                        className="pb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-white/25"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* DAYS */}
+                  <div className="grid grid-cols-7 gap-y-1">
+                    {calendarDays.map(
+                      (
+                        calendarDay,
+                        index
+                      ) => {
+                        const targetDate =
+                          new Date(
+                            calendarYear,
+                            calendarMonth +
+                              calendarDay.monthOffset,
+                            calendarDay.day
+                          );
+
+                        const targetYear =
+                          targetDate.getFullYear();
+
+                        const targetMonth =
+                          targetDate.getMonth();
+
+                        const selected =
+                          isSameDate(
+                            date,
+                            targetYear,
+                            targetMonth,
+                            calendarDay.day
+                          );
+
+                        const todayDate =
+                          isToday(
+                            targetYear,
+                            targetMonth,
+                            calendarDay.day
+                          );
+
+                        const isPast =
+                          targetDate <
+                            new Date(
+                              today.getFullYear(),
+                              today.getMonth(),
+                              today.getDate()
+                            );
+
+                        const outsideMonth =
+                          calendarDay.monthOffset !==
+                          0;
+
+                        return (
+                          <button
+                            key={`${calendarYear}-${calendarMonth}-${index}`}
+                            type="button"
+                            disabled={isPast}
+                            onClick={() =>
+                              handleCalendarDateClick(
+                                calendarDay.day,
+                                calendarDay.monthOffset
+                              )
+                            }
+                            className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-xl text-sm transition sm:h-11 sm:w-11 ${
+                              selected
+                                ? "bg-blue-600 font-semibold text-white"
+                                : todayDate
+                                  ? "border border-blue-500/50 text-blue-300"
+                                  : outsideMonth
+                                    ? "text-white/15"
+                                    : isPast
+                                      ? "cursor-not-allowed text-white/15"
+                                      : "text-white/65 hover:bg-white/[0.06] hover:text-white"
+                            }`}
+                          >
+                            {calendarDay.day}
+
+                            {todayDate &&
+                              !selected && (
+                                <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-blue-400" />
+                              )}
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+
+                {/* SELECTED DATE */}
+                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#030712] px-4 py-3">
+                  <FiCalendar
+                    size={17}
+                    className="shrink-0 text-blue-400"
+                  />
+
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-white/30">
+                      Selected date
+                    </p>
+
+                    <p className="mt-1 truncate text-sm font-medium">
+                      {date
+                        ? new Date(
+                            `${date}T00:00:00`
+                          ).toLocaleDateString(
+                            "en-US",
+                            {
+                              weekday:
+                                "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            }
+                          )
+                        : "Choose a date from the calendar"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* TIME */}
+              {!isMembership && (
+                <div
+                  ref={timeRef}
+                  className="scroll-mt-28 rounded-3xl border border-white/10 bg-[#07101c] p-5 sm:scroll-mt-32 sm:p-7"
+                >
+                  <div className="mb-6">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
+                      04
+                    </p>
+
+                    <h2 className="mt-2 text-2xl font-semibold">
+                      Choose your time
+                    </h2>
+
+                    <p className="mt-2 text-sm text-white/40">
+                      Select an available time slot.
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-[11px] text-white/40">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="h-2 w-2 rounded-full bg-blue-500" />
                         Available
@@ -724,111 +1069,122 @@ export default function BookingPage() {
                       </span>
                     </div>
                   </div>
+
+                  {!date ? (
+                    <div className="rounded-2xl border border-dashed border-white/10 p-7 text-center">
+                      <FiCalendar
+                        size={22}
+                        className="mx-auto text-white/20"
+                      />
+
+                      <p className="mt-3 text-sm text-white/45">
+                        Select a date first
+                      </p>
+
+                      <p className="mt-1 text-xs text-white/25">
+                        Available time slots will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {timeSlots.map((time) => {
+                        const availability =
+                          getAvailability(
+                            selectedService,
+                            time
+                          );
+
+                        const full =
+                          availability?.status ===
+                          "full";
+
+                        const selected =
+                          slot === time;
+
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            disabled={full}
+                            onClick={() =>
+                              handleSlotChange(
+                                time
+                              )
+                            }
+                            className={`rounded-2xl border p-4 text-left transition ${
+                              full
+                                ? "cursor-not-allowed border-white/5 bg-white/[0.02] opacity-45"
+                                : selected
+                                  ? "border-blue-500/70 bg-blue-500/10"
+                                  : "border-white/10 bg-[#030712] hover:border-blue-500/40 hover:bg-blue-500/[0.04]"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-semibold">
+                                {time}
+                              </span>
+
+                              {selected && (
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
+                                  <FiCheck size={12} />
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="mt-3">
+                              {full ? (
+                                <span className="text-xs font-medium text-white/30">
+                                  Fully booked
+                                </span>
+                              ) : selectedService?.capacity ? (
+                                <span className="text-xs text-blue-300/70">
+                                  {
+                                    availability?.remaining
+                                  }{" "}
+                                  spots left
+                                </span>
+                              ) : (
+                                <span className="text-xs text-blue-300/70">
+                                  Available
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {selectedService?.exclusive && (
+                    <div className="mt-5 rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4">
+                      <p className="text-sm font-medium">
+                        Private steam session
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-white/40">
+                        Steam sessions are 30 minutes. When a customer books
+                        a slot, the entire slot becomes unavailable to others.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedService?.id ===
+                    "futsal" && (
+                    <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-sm font-medium">
+                        90-minute booking
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-white/40">
+                        Each Futsal booking occupies the playground for 90
+                        minutes. Overlapping playground activities cannot be
+                        booked.
+                      </p>
+                    </div>
+                  )}
                 </div>
-
-                {!date ? (
-                  <div className="rounded-2xl border border-dashed border-white/10 p-7 text-center">
-                    <FiCalendar
-                      size={22}
-                      className="mx-auto text-white/20"
-                    />
-
-                    <p className="mt-3 text-sm text-white/45">
-                      Select a date first
-                    </p>
-
-                    <p className="mt-1 text-xs text-white/25">
-                      Available time slots will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                    {timeSlots.map((time) => {
-                      const availability = getAvailability(
-                        selectedService,
-                        time
-                      );
-
-                      const full =
-                        availability?.status === "full";
-
-                      const selected = slot === time;
-
-                      return (
-                        <button
-                          key={time}
-                          type="button"
-                          disabled={full}
-                          onClick={() => handleSlotChange(time)}
-                          className={`rounded-2xl border p-4 text-left transition ${
-                            full
-                              ? "cursor-not-allowed border-white/5 bg-white/[0.02] opacity-45"
-                              : selected
-                                ? "border-blue-500/70 bg-blue-500/10"
-                                : "border-white/10 bg-[#030712] hover:border-blue-500/40 hover:bg-blue-500/[0.04]"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-sm font-semibold">
-                              {time}
-                            </span>
-
-                            {selected && (
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
-                                <FiCheck size={12} />
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mt-3">
-                            {full ? (
-                              <span className="text-xs font-medium text-white/30">
-                                Fully booked
-                              </span>
-                            ) : selectedService?.capacity ? (
-                              <span className="text-xs text-blue-300/70">
-                                {availability?.remaining} spots left
-                              </span>
-                            ) : (
-                              <span className="text-xs text-blue-300/70">
-                                Available
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {selectedService?.exclusive && (
-                  <div className="mt-5 rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4">
-                    <p className="text-sm font-medium">
-                      Private steam session
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-white/40">
-                      Steam sessions are 30 minutes. When a customer books
-                      a slot, the entire slot becomes unavailable to others.
-                    </p>
-                  </div>
-                )}
-
-                {selectedService?.id === "futsal" && (
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-sm font-medium">
-                      90-minute booking
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-white/40">
-                      Each Futsal booking occupies the playground for 90
-                      minutes. Overlapping playground activities cannot be
-                      booked.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
 
             {/* MEMBERSHIP NOTICE */}
             {isMembership && (
@@ -890,13 +1246,19 @@ export default function BookingPage() {
 
                 <select
                   value={movie}
-                  onChange={(event) => setMovie(event.target.value)}
+                  onChange={(event) =>
+                    setMovie(event.target.value)
+                  }
                   className="h-14 w-full rounded-2xl border border-white/10 bg-[#030712] px-4 text-sm text-white outline-none transition focus:border-blue-500/60"
                 >
                   {MOVIES.map((item) => (
                     <option
                       key={item}
-                      value={item === "Choose a movie" ? "" : item}
+                      value={
+                        item === "Choose a movie"
+                          ? ""
+                          : item
+                      }
                     >
                       {item}
                     </option>
@@ -918,7 +1280,11 @@ export default function BookingPage() {
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
-                    {isMovie ? "06" : isMembership ? "05" : "05"}
+                    {isMovie
+                      ? "06"
+                      : isMembership
+                        ? "05"
+                        : "05"}
                   </p>
 
                   <h2 className="mt-2 text-2xl font-semibold">
@@ -937,7 +1303,9 @@ export default function BookingPage() {
                     type="button"
                     onClick={decreaseQuantity}
                     disabled={
-                      quantity <= (selectedService?.minimum || 1)
+                      quantity <=
+                      (selectedService?.minimum ||
+                        1)
                     }
                     className="flex h-11 w-11 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                   >
@@ -953,7 +1321,8 @@ export default function BookingPage() {
                     onClick={increaseQuantity}
                     disabled={
                       quantity >=
-                      (selectedService?.capacity || Infinity)
+                      (selectedService?.capacity ||
+                        Infinity)
                     }
                     className="flex h-11 w-11 items-center justify-center rounded-xl text-white/50 transition hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                   >
@@ -977,13 +1346,27 @@ export default function BookingPage() {
 
                   <p className="mt-1 text-sm text-white/40">
                     {quantity} ×{" "}
-                    {formatPrice(selectedService?.price || 0)}
+                    {formatPrice(
+                      selectedService?.price || 0
+                    )}
                   </p>
 
                   {date && (
                     <p className="mt-2 text-xs text-white/30">
-                      {date}
-                      {slot ? ` • ${slot}` : ""}
+                      {new Date(
+                        `${date}T00:00:00`
+                      ).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        }
+                      )}
+
+                      {slot
+                        ? ` • ${slot}`
+                        : ""}
                     </p>
                   )}
                 </div>
@@ -1012,7 +1395,9 @@ export default function BookingPage() {
               {!canAdd && (
                 <p className="mt-3 text-center text-xs text-white/30">
                   Select the required date
-                  {!isMembership ? " and an available time" : ""}
+                  {!isMembership
+                    ? " and an available time"
+                    : ""}
                   {isMovie ? " and movie" : ""} to continue.
                 </p>
               )}
@@ -1045,7 +1430,10 @@ export default function BookingPage() {
           </span>
 
           <span className="text-sm font-medium">
-            {cartCount} {cartCount === 1 ? "item" : "items"}
+            {cartCount}{" "}
+            {cartCount === 1
+              ? "item"
+              : "items"}
           </span>
         </span>
 
@@ -1061,7 +1449,9 @@ export default function BookingPage() {
           <button
             type="button"
             aria-label="Close cart"
-            onClick={() => setCartOpen(false)}
+            onClick={() =>
+              setCartOpen(false)
+            }
             className="absolute inset-0 bg-black/70"
           />
 
@@ -1079,7 +1469,9 @@ export default function BookingPage() {
 
               <button
                 type="button"
-                onClick={() => setCartOpen(false)}
+                onClick={() =>
+                  setCartOpen(false)
+                }
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.05] text-white/60"
               >
                 <FiX size={18} />
@@ -1099,7 +1491,15 @@ export default function BookingPage() {
   );
 }
 
-function ServiceCard({ service, active, onClick }) {
+/* -------------------------------------------------------------------------- */
+/* SERVICE CARD                                                               */
+/* -------------------------------------------------------------------------- */
+
+function ServiceCard({
+  service,
+  active,
+  onClick,
+}) {
   const unitLabel =
     service.unit === "person"
       ? "per person"
@@ -1164,7 +1564,16 @@ function ServiceCard({ service, active, onClick }) {
   );
 }
 
-function CartContent({ cart, total, count, onRemove }) {
+/* -------------------------------------------------------------------------- */
+/* CART CONTENT                                                               */
+/* -------------------------------------------------------------------------- */
+
+function CartContent({
+  cart,
+  total,
+  count,
+  onRemove,
+}) {
   return (
     <>
       <div className="flex items-center justify-between">
@@ -1213,7 +1622,8 @@ function CartContent({ cart, total, count, onRemove }) {
                     </p>
 
                     <p className="mt-1 text-xs text-white/35">
-                      {item.quantity} × {formatPrice(item.price)}
+                      {item.quantity} ×{" "}
+                      {formatPrice(item.price)}
                     </p>
 
                     {item.movie && (
@@ -1235,7 +1645,9 @@ function CartContent({ cart, total, count, onRemove }) {
 
                   <button
                     type="button"
-                    onClick={() => onRemove(item.id)}
+                    onClick={() =>
+                      onRemove(item.id)
+                    }
                     className="shrink-0 text-xs text-white/25 transition hover:text-red-400"
                   >
                     Remove
