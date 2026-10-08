@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -43,7 +44,10 @@ export default function Footer() {
 
                 <h3 className="max-w-md text-3xl font-black tracking-tight sm:text-4xl">
                   COME FIND
-                  <span className="text-blue-500"> THE CHECKPOINT.</span>
+                  <span className="text-blue-500">
+                    {" "}
+                    THE CHECKPOINT.
+                  </span>
                 </h3>
 
                 <p className="mt-4 max-w-lg text-sm leading-7 text-slate-500">
@@ -144,9 +148,10 @@ export default function Footer() {
                     }
                     name="TikTok"
                   />
+
                   <SocialButton
                     href="https://wa.me/8801844240483"
-                    label="The Checkpoint on Whatsapp"
+                    label="The Checkpoint on WhatsApp"
                     icon={<FiMessageCircle size={23} />}
                     name="WhatsApp"
                   />
@@ -194,10 +199,13 @@ export default function Footer() {
         </section>
 
         {/* SECONDARY FOOTER */}
-        <div className="mt-14 grid gap-12 border-t border-white/[0.07] pt-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_0.7fr_0.7fr]">
+        <div className="mt-14 grid gap-12 border-t border-white/[0.07] pt-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.6fr_1fr]">
           {/* BRAND */}
           <div>
-            <a href="/#home" className="inline-flex items-center gap-3">
+            <a
+              href="/#home"
+              className="inline-flex items-center gap-3"
+            >
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600">
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg shadow-lg shadow-blue-600/10 transition-transform duration-200 hover:scale-[1.08] hover:-rotate-1 active:scale-[0.94]">
                   <Image
@@ -246,6 +254,37 @@ export default function Footer() {
               ))}
             </ul>
           </nav>
+
+
+{/* PARTNERED WITH */}
+<div className="lg:pl-6">
+  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-600">
+    Partnered With
+  </p>
+
+  <div className="mt-4 overflow-hidden rounded-2xl border border-white/[0.09]  transition duration-300 hover:border-blue-500/30">
+    <div className="flex items-center justify-center">
+      <Image
+        src="/tickify.jpg"
+        alt="Tickify"
+        width={600}
+        height={300}
+        className="block h-auto w-full object-contain"
+      />
+    </div>
+
+    <div className="flex items-center justify-between border-t border-black/[0.08] bg-[#09111F] px-5 py-3.5">
+      <span className="text-sm font-bold text-slate-300">
+        Tickify
+      </span>
+
+      <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">
+        Partner
+      </span>
+    </div>
+  </div>
+</div>
+
         </div>
       </div>
 
@@ -290,7 +329,9 @@ function SocialButton({ href, icon, name, label }) {
         {icon}
       </span>
 
-      <span className="text-xs font-semibold">{name}</span>
+      <span className="text-xs font-semibold">
+        {name}
+      </span>
     </a>
   );
 }

@@ -6,7 +6,7 @@ import {
   FiMenu,
   FiX,
   FiArrowUpRight,
-  FiFilm,
+  FiCalendar,
   FiActivity,
   FiMonitor,
   FiCoffee,
@@ -37,9 +37,9 @@ const links = [
   },
 
   {
-    name: "Movie",
-    href: "/movie",
-    icon: FiFilm,
+    name: "Booking",
+    href: "/booking",
+    icon: FiCalendar,
   },
   {
     name: "Contact",

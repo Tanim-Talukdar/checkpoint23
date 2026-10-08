@@ -2,95 +2,119 @@ import mongoose from "mongoose";
 
 const BookingSchema = new mongoose.Schema(
   {
-    movieId: {
+    // ------------------------------------------------------------
+    // BOOKING IDENTIFICATION
+    // ------------------------------------------------------------
+
+    bookingReference: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      uppercase: true,
+    },
+
+    bookingGroupReference: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
+      index: true,
+    },
+
+    // ------------------------------------------------------------
+    // CUSTOMER
+    // ------------------------------------------------------------
+
+    customerName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    customerEmail: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    customerPhone: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // ------------------------------------------------------------
+    // FACILITY / SERVICE
+    // ------------------------------------------------------------
+
+    facilityId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Movie",
+      ref: "Facility",
       required: true,
+      index: true,
     },
 
-    movieSnapshot: {
-      title: {
-        type: String,
-        required: true,
-      },
-      poster: {
-        type: String,
-        default: "",
-      },
-      backdrop: {
-        type: String,
-        default: "",
-      },
-      duration: {
-        type: Number,
-        default: 0,
-      },
-      rating: {
-        type: Number,
-        default: 0,
-      },
+    facilityName: {
+      type: String,
+      required: true,
+      trim: true,
     },
 
-    showtimeId: {
+    serviceId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Showtime",
       required: true,
     },
 
-    showtimeSnapshot: {
-      date: {
-        type: String,
-        required: true,
-      },
-      startTime: {
-        type: String,
-        required: true,
-      },
-      ticketPrice: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-    },
-
-    hallId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Hall",
+    serviceName: {
+      type: String,
       required: true,
+      trim: true,
     },
 
-    seats: {
-      type: [String],
+    // ------------------------------------------------------------
+    // BOOKING TIME
+    // ------------------------------------------------------------
+
+    bookingDate: {
+      type: Date,
       required: true,
-      validate: {
-        validator: (seats) =>
-          seats.length >= 1 && seats.length <= 8,
-        message: "You can book between 1 and 8 seats",
-      },
+      index: true,
     },
 
-    customer: {
-      name: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 100,
-      },
+    startTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
 
-      email: {
-        type: String,
-        required: true,
-        trim: true,
-        lowercase: true,
-        maxlength: 150,
-      },
+    endTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
 
-      phone: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 20,
-      },
+    durationMinutes: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
+    // ------------------------------------------------------------
+    // QUANTITY / PRICE
+    // ------------------------------------------------------------
+
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
+    priceAtBooking: {
+      type: Number,
+      required: true,
+      min: 0,
     },
 
     totalAmount: {
@@ -99,33 +123,151 @@ const BookingSchema = new mongoose.Schema(
       min: 0,
     },
 
-    payment: {
-      tranId: {
-        type: String,
-        unique: true,
-        sparse: true,
-      },
-      valId: String,
-      bankTranId: String,
-      cardType: String,
-      paymentMethod: String,
+    // ------------------------------------------------------------
+    // MOVIE
+    // ------------------------------------------------------------
+
+    movieName: {
+      type: String,
+      default: "",
+      trim: true,
     },
+
+    // ------------------------------------------------------------
+    // BOOKING STATUS
+    // ------------------------------------------------------------
+
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "confirmed",
+        "completed",
+        "cancelled",
+      ],
+      default: "pending",
+      index: true,
+    },
+
+    // ------------------------------------------------------------
+    // PAYMENT STATUS
+    // ------------------------------------------------------------
 
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed", "cancelled"],
-      default: "pending",
+      enum: [
+        "unpaid",
+        "pending",
+        "paid",
+        "failed",
+        "refunded",
+      ],
+      default: "unpaid",
+      index: true,
     },
 
-    bookingStatus: {
+    paymentTransactionId: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled"],
-      default: "pending",
+      default: "",
+      trim: true,
+      uppercase: true,
+      index: true,
     },
 
+    paymentValidationId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    paymentBankTransactionId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    paymentCardType: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    paymentMethod: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    paymentInitiatedAt: {
+      type: Date,
+      default: null,
+    },
+
+    paymentPaidAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ------------------------------------------------------------
+    // PENDING BOOKING EXPIRATION
+    // ------------------------------------------------------------
+
+    /*
+     * IMPORTANT:
+     *
+     * MongoDB TTL automatically deletes this Booking document
+     * when expiresAt is reached.
+     *
+     * Pending booking:
+     *   expiresAt = creation time + 15 minutes
+     *
+     * Confirmed booking:
+     *   expiresAt = null
+     *
+     * Therefore confirmed bookings are NOT deleted by TTL.
+     */
     expiresAt: {
       type: Date,
-      default: () => new Date(Date.now() + 6 * 60 * 1000),
+      default: null,
+    },
+
+    // ------------------------------------------------------------
+    // CHECK-IN / CHECK-OUT
+    // ------------------------------------------------------------
+
+    checkedIn: {
+      type: Boolean,
+      default: false,
+    },
+
+    checkedInAt: {
+      type: Date,
+      default: null,
+    },
+
+    checkedOut: {
+      type: Boolean,
+      default: false,
+    },
+
+    checkedOutAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ------------------------------------------------------------
+    // CANCELLATION
+    // ------------------------------------------------------------
+
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    cancellationReason: {
+      type: String,
+      default: "",
+      trim: true,
     },
   },
   {
@@ -133,34 +275,91 @@ const BookingSchema = new mongoose.Schema(
   }
 );
 
-// Automatically remove expired pending bookings
+// ------------------------------------------------------------
+// NORMAL INDEXES
+// ------------------------------------------------------------
+
+BookingSchema.index({
+  facilityId: 1,
+  bookingDate: 1,
+  startTime: 1,
+});
+
+BookingSchema.index({
+  facilityId: 1,
+  bookingDate: 1,
+  status: 1,
+});
+
+BookingSchema.index({
+  customerEmail: 1,
+  bookingDate: -1,
+});
+
+BookingSchema.index({
+  customerPhone: 1,
+  bookingDate: -1,
+});
+
+BookingSchema.index({
+  status: 1,
+  bookingDate: 1,
+});
+
+BookingSchema.index({
+  paymentStatus: 1,
+  createdAt: -1,
+});
+
+BookingSchema.index({
+  bookingGroupReference: 1,
+  createdAt: 1,
+});
+
+BookingSchema.index({
+  paymentTransactionId: 1,
+});
+
+// ------------------------------------------------------------
+// TTL INDEX
+// ------------------------------------------------------------
+
+/*
+ * MongoDB automatically removes the Booking document when
+ * expiresAt is reached.
+ *
+ * expireAfterSeconds: 0 means:
+ *
+ *     delete when expiresAt <= current MongoDB time
+ *
+ * IMPORTANT:
+ *
+ * Only documents with a Date value in expiresAt are removed.
+ *
+ * Confirmed bookings have:
+ *
+ *     expiresAt: null
+ *
+ * so they are NOT removed.
+ */
 BookingSchema.index(
-  { expiresAt: 1 },
+  {
+    expiresAt: 1,
+  },
   {
     expireAfterSeconds: 0,
-    partialFilterExpression: {
-      bookingStatus: "pending",
-      paymentStatus: "pending",
-    },
   }
 );
 
-// Prevent the same seat from being booked twice
-BookingSchema.index(
-  { showtimeId: 1, seats: 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      $or: [
-        { bookingStatus: "confirmed" },
-        {
-          bookingStatus: "pending",
-          paymentStatus: "pending",
-        },
-      ],
-    },
-  }
-);
+// ------------------------------------------------------------
+// STATUS / PAYMENT / EXPIRY QUERY INDEX
+// ------------------------------------------------------------
+
+BookingSchema.index({
+  expiresAt: 1,
+  status: 1,
+  paymentStatus: 1,
+});
 
 export default mongoose.models.Booking ||
   mongoose.model("Booking", BookingSchema);

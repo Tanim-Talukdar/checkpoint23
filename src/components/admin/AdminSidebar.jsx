@@ -12,6 +12,8 @@ import {
   FiMenu,
   FiX,
   FiLogOut,
+  FiLayers,
+  FiUserCheck,
 } from "react-icons/fi";
 import { useState } from "react";
 
@@ -22,29 +24,25 @@ const navigation = [
     icon: FiGrid,
   },
   {
-    name: "Movies",
-    href: "/admin/movies",
-    icon: FiFilm,
+    name: "Facalites",
+    href: "/admin/facalites",
+    icon: FiLayers,
   },
-  {
-    name: "Halls",
-    href: "/admin/halls",
-    icon: FiMonitor,
-  },
-  {
-    name: "Showtimes",
-    href: "/admin/showtimes",
-    icon: FiClock,
-  },
-  {
+    {
     name: "Bookings",
     href: "/admin/bookings",
     icon: FiUsers,
   },
   {
-    name: "Manual Bookings",
-    href: "/admin/manual-bookings",
-    icon: FiUsers,
+    name: "Booking Slot",
+    href: "/admin/booking-slots",
+    icon: FiClock,
+  },
+
+  {
+    name: "Membership",
+    href: "/admin/membership",
+    icon: FiUserCheck,
   },
   {
     name: "Payments",

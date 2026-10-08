@@ -5,12 +5,11 @@ import "./globals.css";
 import { usePathname } from "next/navigation";
 import Footer from "@/components/layout/Footer";
 
-
-
 export default function RootLayout({ children }) {
   const pathname = usePathname();
 
   const isAdmin = pathname.startsWith("/admin");
+  const isBooking = pathname.startsWith("/booking");
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -129,7 +128,7 @@ export default function RootLayout({ children }) {
 
         <main>{children}</main>
 
-        {!isAdmin && <Footer />}
+        {!isAdmin && !isBooking && <Footer />}
       </body>
     </html>
   );

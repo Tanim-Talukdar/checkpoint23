@@ -1,95 +1,613 @@
-
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-
 import {
-  FiFilm,
-  FiMonitor,
-  FiClock,
+  FiActivity,
   FiArrowUpRight,
   FiCalendar,
-  FiRefreshCw,
-  FiAlertCircle,
-  FiActivity,
   FiCheckCircle,
+  FiClock,
+  FiDollarSign,
+  FiRefreshCw,
+  FiUsers,
+  FiVideo,
+  FiWind,
 } from "react-icons/fi";
 
-const HALL_NAME = "Hall 1";
-const HALL_CAPACITY = 50;
-const HALL_ROWS = 5;
-const SEATS_PER_ROW = 10;
+/* -------------------------------------------------------------------------- */
+/* CONSTANTS                                                                  */
+/* -------------------------------------------------------------------------- */
 
-/* =========================
-   HELPERS
-========================= */
+const FACILITY_ICON_MAP = {
+  gym: FiActivity,
+  "swimming-pool": FiUsers,
+  "gym-pool": FiActivity,
+  "steam-bath": FiWind,
+  playground: FiActivity,
+  "private-movie": FiVideo,
+};
 
-function getToday() {
-  const date = new Date();
+const FACILITY_TYPE_LABELS = {
+  fitness: "Fitness",
+  steam: "Wellness",
+  playground: "Sports",
+  movie: "Entertainment",
+};
 
-  const year = date.getFullYear();
+const FITNESS_DAY_PASS_SLUGS = new Set([
+  "gym-day-pass",
+  "pool-day-pass",
+  "gym-pool-day-pass",
+]);
 
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, "0");
+const MEMBERSHIP_TYPES = new Set([
+  "membership",
+]);
 
-  const day = String(
-    date.getDate()
-  ).padStart(2, "0");
+const ACTIVE_BOOKING_STATUSES = new Set([
+  "pending",
+  "confirmed",
+]);
 
-  return `${year}-${month}-${day}`;
+const PAID_PAYMENT_STATUSES = new Set([
+  "paid",
+]);
+
+/* -------------------------------------------------------------------------- */
+/* DATE HELPERS                                                               */
+/* -------------------------------------------------------------------------- */
+
+function getDhakaDateParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const result = {};
+
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      result[part.type] = part.value;
+    }
+  }
+
+  return {
+    year: Number(result.year),
+    month: Number(result.month),
+    day: Number(result.day),
+  };
+}
+
+function toDateString(year, month, day) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(
+    2,
+    "0"
+  )}-${String(day).padStart(2, "0")}`;
+}
+
+function getDhakaDateString(date = new Date()) {
+  const parts = getDhakaDateParts(date);
+
+  return toDateString(
+    parts.year,
+    parts.month,
+    parts.day
+  );
+}
+
+function addCalendarDays(dateString, days) {
+  const [year, month, day] = dateString
+    .split("-")
+    .map(Number);
+
+  const date = new Date(
+    Date.UTC(year, month - 1, day)
+  );
+
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return toDateString(
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate()
+  );
+}
+
+function formatDate() {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Dhaka",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
 }
 
 function formatTime(time) {
-  if (!time) {
-    return "--";
+  if (!time || typeof time !== "string") {
+    return "—";
   }
 
-  const [hours, minutes] =
-    String(time).split(":");
+  const match = time.match(/^(\d{2}):(\d{2})$/);
 
-  const date = new Date();
+  if (!match) {
+    return time;
+  }
 
-  date.setHours(
-    Number(hours),
-    Number(minutes),
-    0,
-    0
-  );
+  const hours = Number(match[1]);
+  const minutes = match[2];
 
-  return date.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHour =
+    hours % 12 === 0 ? 12 : hours % 12;
+
+  return `${displayHour}:${minutes} ${period}`;
 }
 
-function formatDate(dateString) {
-  if (!dateString) {
-    return "--";
+function formatBookingDateTime(booking) {
+  if (!booking?.bookingDate) {
+    return "—";
   }
 
-  const date = new Date(
-    `${dateString}T00:00:00`
-  );
+  const date = new Date(booking.bookingDate);
 
-  return date.toLocaleDateString([], {
+  if (Number.isNaN(date.getTime())) {
+    return `${booking.startTime || "—"}`;
+  }
+
+  const dateText = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Dhaka",
     month: "short",
     day: "numeric",
     year: "numeric",
+  }).format(date);
+
+  const timeText = booking.startTime
+    ? formatTime(booking.startTime)
+    : "";
+
+  return timeText
+    ? `${dateText}, ${timeText}`
+    : dateText;
+}
+
+function formatScheduleDateTime(booking, today) {
+  if (!booking?.bookingDate) {
+    return "—";
+  }
+
+  const date = new Date(booking.bookingDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return formatTime(booking.startTime);
+  }
+
+  const bookingDate = new Intl.DateTimeFormat(
+    "en-CA",
+    {
+      timeZone: "Asia/Dhaka",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }
+  ).format(date);
+
+  if (bookingDate === today) {
+    return formatTime(booking.startTime);
+  }
+
+  return `${new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Dhaka",
+    month: "short",
+    day: "numeric",
+  }).format(date)}, ${formatTime(
+    booking.startTime
+  )}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* API HELPERS                                                                */
+/* -------------------------------------------------------------------------- */
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || !data?.success) {
+    throw new Error(
+      data?.error ||
+        data?.message ||
+        `Request failed with status ${response.status}.`
+    );
+  }
+
+  return data;
+}
+
+async function fetchBookings(params = {}) {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      query.set(key, String(value));
+    }
+  });
+
+  const queryString = query.toString();
+
+  return fetchJson(
+    `/api/bookings/admin${
+      queryString ? `?${queryString}` : ""
+    }`
+  );
+}
+
+async function fetchPayments() {
+  return fetchJson("/api/payment");
+}
+
+async function fetchFacilities() {
+  return fetchJson("/api/facilites");
+}
+
+async function fetchBookingSlots(
+  facilityId,
+  serviceId,
+  date
+) {
+  const query = new URLSearchParams({
+    facilityId,
+    serviceId,
+    date,
+  });
+
+  return fetchJson(
+    `/api/booking-slots?${query.toString()}`
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* DATA HELPERS                                                               */
+/* -------------------------------------------------------------------------- */
+
+function getOccupancyPercentage(booked, capacity) {
+  const safeBooked = Number(booked) || 0;
+  const safeCapacity = Number(capacity) || 0;
+
+  if (safeCapacity <= 0) {
+    return 0;
+  }
+
+  return Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(
+        (safeBooked / safeCapacity) * 100
+      )
+    )
+  );
+}
+
+function getFacilityIcon(slug) {
+  return FACILITY_ICON_MAP[slug] || FiActivity;
+}
+
+function getFacilityTypeLabel(facility) {
+  return (
+    FACILITY_TYPE_LABELS[
+      facility?.facilityType
+    ] || "Facility"
+  );
+}
+
+function getStatusClasses(status) {
+  switch (status) {
+    case "Full":
+      return "border-red-400/20 bg-red-400/10 text-red-300";
+
+    case "Limited":
+      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+
+    case "Booked":
+      return "border-blue-400/20 bg-blue-400/10 text-blue-300";
+
+    case "Confirmed":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+
+    case "Pending":
+      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+
+    case "Completed":
+      return "border-blue-400/20 bg-blue-400/10 text-blue-300";
+
+    case "Cancelled":
+      return "border-red-400/20 bg-red-400/10 text-red-300";
+
+    case "Failed":
+      return "border-red-400/20 bg-red-400/10 text-red-300";
+
+    case "Paid":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+
+    default:
+      return "border-white/10 bg-white/[0.03] text-white/50";
+  }
+}
+
+function getFacilityStatus(booked, capacity) {
+  const safeBooked = Number(booked) || 0;
+  const safeCapacity = Number(capacity) || 0;
+
+  if (safeCapacity > 0 && safeBooked >= safeCapacity) {
+    return "Full";
+  }
+
+  if (
+    safeCapacity > 0 &&
+    safeBooked / safeCapacity >= 0.75
+  ) {
+    return "Limited";
+  }
+
+  return "Available";
+}
+
+function sortBookingsByStartTime(bookings) {
+  return [...bookings].sort((a, b) => {
+    const aTime =
+      typeof a.startTime === "string"
+        ? a.startTime
+        : "99:99";
+
+    const bTime =
+      typeof b.startTime === "string"
+        ? b.startTime
+        : "99:99";
+
+    return aTime.localeCompare(bTime);
   });
 }
 
-/* =========================
-   DASHBOARD
-========================= */
+function isPaidBooking(booking) {
+  return PAID_PAYMENT_STATUSES.has(
+    String(booking?.paymentStatus || "").toLowerCase()
+  );
+}
+
+function isActiveBooking(booking) {
+  return ACTIVE_BOOKING_STATUSES.has(
+    String(booking?.status || "").toLowerCase()
+  );
+}
+
+function isMembershipBooking(
+  booking,
+  membershipServiceNames
+) {
+  const serviceName = String(
+    booking?.service?.name || ""
+  ).toLowerCase();
+
+  if (
+    membershipServiceNames.has(serviceName)
+  ) {
+    return true;
+  }
+
+  return serviceName.includes("membership");
+}
+
+function calculateRevenue(bookings) {
+  return bookings.reduce(
+    (total, booking) => {
+      if (!isPaidBooking(booking)) {
+        return total;
+      }
+
+      return (
+        total +
+        (Number(booking.totalAmount) || 0)
+      );
+    },
+    0
+  );
+}
+
+function calculateAverageOccupancy(
+  facilities
+) {
+  const values = facilities
+    .filter(
+      (facility) =>
+        Number(facility.capacity) > 0
+    )
+    .map((facility) =>
+      getOccupancyPercentage(
+        facility.booked,
+        facility.capacity
+      )
+    );
+
+  if (!values.length) {
+    return 0;
+  }
+
+  return Math.round(
+    values.reduce(
+      (sum, value) => sum + value,
+      0
+    ) / values.length
+  );
+}
+
+function getBookingUsage(
+  booking,
+  facilityMap
+) {
+  const facility = facilityMap.get(
+    booking?.facility?.id
+  );
+
+  const service = facility?.services?.find(
+    (item) =>
+      String(item._id) ===
+      String(booking?.service?.id)
+  );
+
+  if (!service) {
+    return {
+      usage: "Booked",
+      status: "Booked",
+    };
+  }
+
+  if (
+    service.pricingType === "per_booking" ||
+    service.exclusive === true
+  ) {
+    return {
+      usage: "Booked",
+      status: "Booked",
+    };
+  }
+
+  const capacity =
+    service.capacity == null
+      ? null
+      : Number(service.capacity);
+
+  const quantity =
+    Number(booking.quantity) || 0;
+
+  if (!capacity) {
+    return {
+      usage: `${quantity}`,
+      status: "Available",
+    };
+  }
+
+  const percentage =
+    getOccupancyPercentage(
+      quantity,
+      capacity
+    );
+
+  let status = "Available";
+
+  if (quantity >= capacity) {
+    status = "Full";
+  } else if (percentage >= 75) {
+    status = "Limited";
+  }
+
+  return {
+    usage: `${quantity} / ${capacity}`,
+    status,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* STAT CARD                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function StatCard({ item }) {
+  const Icon = item.icon;
+
+  return (
+    <div className="group rounded-2xl border border-white/10 bg-[#07101D] p-5 transition-colors hover:border-blue-400/20">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
+            {item.label}
+          </p>
+
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            {item.value}
+          </p>
+        </div>
+
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-400/15 bg-blue-500/10 text-blue-400">
+          <Icon size={18} />
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2 text-xs">
+        <span className="font-medium text-blue-400">
+          {item.change}
+        </span>
+
+        <span className="text-white/35">
+          {item.description}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* SECTION HEADER                                                             */
+/* -------------------------------------------------------------------------- */
+
+function SectionHeader({
+  title,
+  description,
+  action,
+}) {
+  return (
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-white">
+          {title}
+        </h2>
+
+        {description && (
+          <p className="mt-1 text-sm text-white/40">
+            {description}
+          </p>
+        )}
+      </div>
+
+      {action}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* MAIN DASHBOARD                                                             */
+/* -------------------------------------------------------------------------- */
 
 export default function AdminDashboard() {
-  const [movies, setMovies] =
-    useState([]);
+  const [dashboardData, setDashboardData] =
+    useState({
+      todayBookings: [],
+      upcomingBookings: [],
+      recentBookings: [],
+      facilities: [],
+      payments: [],
+      membershipCount: 0,
+    });
 
-  const [showtimes, setShowtimes] =
-    useState([]);
+  const [lastUpdated, setLastUpdated] =
+    useState(new Date());
 
   const [loading, setLoading] =
     useState(true);
@@ -100,119 +618,519 @@ export default function AdminDashboard() {
   const [error, setError] =
     useState("");
 
-  /* =========================
-     FETCH DATA
-  ========================= */
+  const formattedDate = useMemo(
+    () => formatDate(),
+    [lastUpdated]
+  );
 
-  const fetchDashboard = useCallback(
-    async (isRefresh = false) => {
+  const today = useMemo(
+    () => getDhakaDateString(),
+    [lastUpdated]
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /* LOAD DASHBOARD                                                           */
+  /* ------------------------------------------------------------------------ */
+
+  const loadDashboard = useCallback(
+    async ({ refresh = false } = {}) => {
+      if (refresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError("");
+
       try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
+        const todayDate =
+          getDhakaDateString();
 
-        setError("");
+        const upcomingDates =
+          Array.from(
+            { length: 7 },
+            (_, index) =>
+              addCalendarDays(
+                todayDate,
+                index
+              )
+          );
 
+        /*
+         * First load the facilities and the main
+         * booking/payment data in parallel.
+         */
         const [
-          moviesResponse,
-          showtimesResponse,
+          facilitiesResponse,
+          paymentsResponse,
+          todayResponse,
+          recentResponse,
+          ...upcomingResponses
         ] = await Promise.all([
-          fetch("/api/movies", {
-            cache: "no-store",
+          fetchFacilities(),
+          fetchPayments(),
+
+          fetchBookings({
+            date: todayDate,
+            limit: 100,
+            page: 1,
           }),
 
-          fetch("/api/showtimes", {
-            cache: "no-store",
+          fetchBookings({
+            limit: 10,
+            page: 1,
           }),
+
+          ...upcomingDates.map((date) =>
+            fetchBookings({
+              date,
+              limit: 100,
+              page: 1,
+            })
+          ),
         ]);
 
-        /* =========================
-           PARSE MOVIES
-        ========================= */
-
-        let moviesData;
-
-        try {
-          moviesData =
-            await moviesResponse.json();
-        } catch {
-          throw new Error(
-            "Movies API returned an invalid response."
-          );
-        }
-
-        /* =========================
-           PARSE SHOWTIMES
-        ========================= */
-
-        let showtimesData;
-
-        try {
-          showtimesData =
-            await showtimesResponse.json();
-        } catch {
-          throw new Error(
-            "Showtimes API returned an invalid response."
-          );
-        }
-
-        /* =========================
-           MOVIES ERROR
-        ========================= */
-
-        if (
-          !moviesResponse.ok ||
-          !moviesData.success
-        ) {
-          throw new Error(
-            moviesData.message ||
-              `Unable to load movies. (${moviesResponse.status})`
-          );
-        }
-
-        /* =========================
-           SHOWTIMES ERROR
-        ========================= */
-
-        if (
-          !showtimesResponse.ok ||
-          !showtimesData.success
-        ) {
-          throw new Error(
-            showtimesData.message ||
-              `Unable to load showtimes. (${showtimesResponse.status})`
-          );
-        }
-
-        /* =========================
-           SET DATA
-        ========================= */
-
-        setMovies(
+        const facilities =
           Array.isArray(
-            moviesData.movies
+            facilitiesResponse.facilities
           )
-            ? moviesData.movies
-            : []
+            ? facilitiesResponse.facilities
+            : [];
+
+        const todayBookings =
+          Array.isArray(
+            todayResponse.data
+          )
+            ? todayResponse.data
+            : [];
+
+        const recentBookings =
+          Array.isArray(
+            recentResponse.data
+          )
+            ? recentResponse.data
+            : [];
+
+        const upcomingBookings =
+          upcomingResponses
+            .flatMap((response) =>
+              Array.isArray(response?.data)
+                ? response.data
+                : []
+            )
+            .filter(
+              (booking, index, array) =>
+                array.findIndex(
+                  (item) =>
+                    item.id === booking.id
+                ) === index
+            )
+            .filter(
+              (booking) =>
+                isActiveBooking(booking)
+            )
+            .sort((a, b) => {
+              const aDate =
+                new Date(
+                  a.bookingDate
+                ).getTime();
+
+              const bDate =
+                new Date(
+                  b.bookingDate
+                ).getTime();
+
+              if (aDate !== bDate) {
+                return aDate - bDate;
+              }
+
+              return String(
+                a.startTime || ""
+              ).localeCompare(
+                String(
+                  b.startTime || ""
+                )
+              );
+            });
+
+        /*
+         * Memberships are represented by actual membership
+         * services in the facility configuration.
+         *
+         * We query each membership service through the
+         * existing admin bookings endpoint using its
+         * supported search parameter.
+         */
+        const membershipServices =
+          facilities.flatMap(
+            (facility) =>
+              Array.isArray(
+                facility.services
+              )
+                ? facility.services
+                    .filter(
+                      (service) =>
+                        MEMBERSHIP_TYPES.has(
+                          service.type
+                        ) ||
+                        service.pricingType ===
+                          "monthly"
+                    )
+                    .map((service) => ({
+                      facility,
+                      service,
+                    }))
+                : []
+          );
+
+        const membershipResponses =
+          await Promise.all(
+            membershipServices.map(
+              ({ service }) =>
+                fetchBookings({
+                  limit: 100,
+                  page: 1,
+                  status: "confirmed",
+                  paymentStatus: "paid",
+                  search: service.name,
+                })
+            )
+          );
+
+        const membershipIds =
+          new Set();
+
+        membershipResponses.forEach(
+          (response) => {
+            if (
+              !Array.isArray(
+                response?.data
+              )
+            ) {
+              return;
+            }
+
+            response.data.forEach(
+              (booking) => {
+                if (
+                  isMembershipBooking(
+                    booking,
+                    new Set(
+                      membershipServices.map(
+                        ({
+                          service,
+                        }) =>
+                          service.name.toLowerCase()
+                      )
+                    )
+                  )
+                ) {
+                  membershipIds.add(
+                    booking.id
+                  );
+                }
+              }
+            );
+          }
         );
 
-        setShowtimes(
-          Array.isArray(
-            showtimesData.showtimes
+        /*
+         * Booking-slot calls are made only for the
+         * primary capacity-bearing service of each
+         * facility.
+         *
+         * Membership services are deliberately skipped.
+         */
+        const slotRequests =
+          facilities.flatMap(
+            (facility) => {
+              const services =
+                Array.isArray(
+                  facility.services
+                )
+                  ? facility.services
+                  : [];
+
+              let service = null;
+
+              if (
+                facility.slug ===
+                "playground"
+              ) {
+                service =
+                  services.find(
+                    (item) =>
+                      item.slug ===
+                      "futsal"
+                  ) || services[0];
+              } else if (
+                facility.slug ===
+                "private-movie"
+              ) {
+                service =
+                  services.find(
+                    (item) =>
+                      item.type ===
+                      "private_movie"
+                  ) || services[0];
+              } else {
+                service =
+                  services.find(
+                    (item) =>
+                      item.type ===
+                      "day_pass"
+                  ) ||
+                  services.find(
+                    (item) =>
+                      item.pricingType !==
+                      "monthly"
+                  ) ||
+                  services[0];
+              }
+
+              if (
+                !service ||
+                service.type ===
+                  "membership" ||
+                service.pricingType ===
+                  "monthly"
+              ) {
+                return [];
+              }
+
+              return [
+                {
+                  facility,
+                  service,
+                },
+              ];
+            }
+          );
+
+        const slotResponses =
+          await Promise.all(
+            slotRequests.map(
+              async ({
+                facility,
+                service,
+              }) => {
+                try {
+                  const response =
+                    await fetchBookingSlots(
+                      String(
+                        facility._id
+                      ),
+                      String(
+                        service._id
+                      ),
+                      todayDate
+                    );
+
+                  return {
+                    facilityId:
+                      String(
+                        facility._id
+                      ),
+                    response,
+                  };
+                } catch {
+                  return {
+                    facilityId:
+                      String(
+                        facility._id
+                      ),
+                    response: null,
+                  };
+                }
+              }
+            )
+          );
+
+        const slotResponseMap =
+          new Map(
+            slotResponses.map(
+              (item) => [
+                item.facilityId,
+                item.response,
+              ]
+            )
+          );
+
+        /*
+         * Build facility overview data from
+         * real booking-slot availability.
+         */
+        const liveFacilities =
+          facilities.map(
+            (facility) => {
+              const facilityId =
+                String(
+                  facility._id
+                );
+
+              const slotResponse =
+                slotResponseMap.get(
+                  facilityId
+                );
+
+              const service =
+                slotResponse?.service ||
+                (
+                  Array.isArray(
+                    facility.services
+                  )
+                    ? facility.services.find(
+                        (item) =>
+                          item.type ===
+                          "day_pass"
+                      ) ||
+                      facility.services.find(
+                        (item) =>
+                          item.pricingType !==
+                          "monthly"
+                      )
+                    : null
+                );
+
+              const slots =
+                Array.isArray(
+                  slotResponse?.slots
+                )
+                  ? slotResponse.slots
+                  : [];
+
+              /*
+               * For a live overview, use the highest
+               * booked count among today's slots.
+               *
+               * This represents the current maximum
+               * simultaneous occupancy visible from
+               * the availability API.
+               */
+              const maxBooked =
+                slots.length
+                  ? Math.max(
+                      ...slots.map(
+                        (slot) =>
+                          Number(
+                            slot.booked
+                          ) || 0
+                      )
+                    )
+                  : 0;
+
+              const capacity =
+                service?.capacity !=
+                null
+                  ? Number(
+                      service.capacity
+                    )
+                  : slots.length
+                  ? Math.max(
+                      ...slots.map(
+                        (slot) =>
+                          Number(
+                            slot.capacity
+                          ) || 0
+                      )
+                    )
+                  : 0;
+
+              /*
+               * If there are no slots, fall back
+               * to today's active bookings for this
+               * facility.
+               */
+              const fallbackBooked =
+                todayBookings
+                  .filter(
+                    (booking) =>
+                      String(
+                        booking
+                          ?.facility
+                          ?.id
+                      ) ===
+                      facilityId
+                  )
+                  .filter(
+                    (booking) =>
+                      isActiveBooking(
+                        booking
+                      )
+                  )
+                  .reduce(
+                    (sum, booking) =>
+                      sum +
+                      (Number(
+                        booking.quantity
+                      ) || 0),
+                    0
+                  );
+
+              const booked =
+                slots.length
+                  ? maxBooked
+                  : fallbackBooked;
+
+              const safeCapacity =
+                capacity > 0
+                  ? capacity
+                  : facility.slug ===
+                    "private-movie"
+                  ? 50
+                  : facility.slug ===
+                    "playground"
+                  ? 1
+                  : 0;
+
+              return {
+                id: facilityId,
+                name: facility.name,
+                slug: facility.slug,
+                type: getFacilityTypeLabel(
+                  facility
+                ),
+                booked,
+                capacity:
+                  safeCapacity,
+                status:
+                  safeCapacity > 0
+                    ? getFacilityStatus(
+                        booked,
+                        safeCapacity
+                      )
+                    : "Available",
+                icon:
+                  getFacilityIcon(
+                    facility.slug
+                  ),
+              };
+            }
+          );
+
+        setDashboardData({
+          todayBookings,
+          upcomingBookings,
+          recentBookings,
+          facilities: liveFacilities,
+          payments: Array.isArray(
+            paymentsResponse.transactions
           )
-            ? showtimesData.showtimes
-            : []
-        );
-      } catch (error) {
+            ? paymentsResponse.transactions
+            : [],
+          membershipCount:
+            membershipIds.size,
+        });
+
+        setLastUpdated(new Date());
+      } catch (loadError) {
         console.error(
-          "Dashboard fetch error:",
-          error
+          "Admin dashboard loading error:",
+          loadError
         );
 
         setError(
-          error?.message ||
+          loadError?.message ||
             "Unable to load dashboard data."
         );
       } finally {
@@ -223,608 +1141,623 @@ export default function AdminDashboard() {
     []
   );
 
-  /* =========================
-     INITIAL LOAD
-  ========================= */
+  /* ------------------------------------------------------------------------ */
+  /* INITIAL LOAD                                                             */
+  /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    loadDashboard();
+  }, [loadDashboard]);
 
-  const today = getToday();
+  /* ------------------------------------------------------------------------ */
+  /* DERIVED DATA                                                             */
+  /* ------------------------------------------------------------------------ */
 
-  /* =========================
-     TODAY SHOWS
-  ========================= */
+  const todayBookings =
+    dashboardData.todayBookings;
 
-  const todayShowtimes = useMemo(() => {
-    return showtimes
-      .filter(
-        (showtime) =>
-          showtime.date === today
-      )
-      .sort((a, b) =>
-        String(
-          a.startTime
-        ).localeCompare(
-          String(b.startTime)
-        )
-      );
-  }, [showtimes, today]);
+  const upcomingBookings =
+    dashboardData.upcomingBookings;
 
-  /* =========================
-     UPCOMING SHOWS
-  ========================= */
+  const recentBookings =
+    dashboardData.recentBookings;
 
-  const upcomingShows = useMemo(() => {
-    return [...showtimes]
-      .filter(
-        (showtime) =>
-          String(showtime.date) >=
-          String(today)
-      )
-      .sort((a, b) => {
-        const dateCompare =
-          String(a.date).localeCompare(
-            String(b.date)
-          );
+  const facilities =
+    dashboardData.facilities;
 
-        if (dateCompare !== 0) {
-          return dateCompare;
-        }
+  const todayRevenue =
+    calculateRevenue(todayBookings);
 
-        return String(
-          a.startTime
-        ).localeCompare(
-          String(b.startTime)
-        );
-      })
-      .slice(0, 5);
-  }, [showtimes, today]);
+  const occupancy =
+    calculateAverageOccupancy(
+      facilities
+    );
 
-  /* =========================
-     STATS
-  ========================= */
+  const confirmedToday =
+    todayBookings.filter(
+      (booking) =>
+        booking.status ===
+        "confirmed"
+    ).length;
 
-  const stats = [
+  const paidToday =
+    todayBookings.filter(
+      (booking) =>
+        booking.paymentStatus ===
+        "paid"
+    ).length;
+
+  const dashboardStats = [
     {
-      title: "Total Movies",
-      value: movies.length,
+      label: "Today's Bookings",
+      value: todayBookings.length.toLocaleString(
+        "en-BD"
+      ),
+      change:
+        confirmedToday > 0
+          ? `${confirmedToday} confirmed`
+          : "Live",
       description:
-        movies.length === 1
-          ? "1 movie available"
-          : `${movies.length} movies available`,
-      icon: FiFilm,
+        "today's bookings",
+      icon: FiCalendar,
     },
-
     {
-      title: "Cinema Hall",
-      value: 1,
-      description: `${HALL_CAPACITY} total seats`,
-      icon: FiMonitor,
-    },
-
-    {
-      title: "Today's Shows",
-      value: todayShowtimes.length,
+      label: "Today's Revenue",
+      value: `৳${todayRevenue.toLocaleString(
+        "en-BD"
+      )}`,
+      change:
+        paidToday > 0
+          ? `${paidToday} paid`
+          : "৳0 paid",
       description:
-        todayShowtimes.length === 0
-          ? "No shows scheduled today"
-          : `${todayShowtimes.length} shows today`,
+        "from paid bookings",
+      icon: FiDollarSign,
+    },
+    {
+      label: "Upcoming Bookings",
+      value:
+        upcomingBookings.length.toLocaleString(
+          "en-BD"
+        ),
+      change: "Next 7 days",
+      description:
+        "active bookings",
       icon: FiClock,
     },
-
     {
-      title: "Total Shows",
-      value: showtimes.length,
+      label: "Active Memberships",
+      value:
+        dashboardData.membershipCount.toLocaleString(
+          "en-BD"
+        ),
+      change: "Confirmed",
       description:
-        showtimes.length === 0
-          ? "No showtimes created"
-          : `${showtimes.length} scheduled shows`,
-      icon: FiCalendar,
+        "paid memberships",
+      icon: FiUsers,
+    },
+    {
+      label: "Today's Occupancy",
+      value: `${occupancy}%`,
+      change:
+        occupancy >= 75
+          ? "High"
+          : occupancy >= 50
+          ? "Healthy"
+          : "Available",
+      description:
+        "facility usage",
+      icon: FiActivity,
     },
   ];
 
-  /* =========================
-     LOADING
-  ========================= */
+  const facilityMap = useMemo(
+    () =>
+      new Map(
+        dashboardData.facilities.map(
+          (facility) => [
+            facility.id,
+            facility,
+          ]
+        )
+      ),
+    [dashboardData.facilities]
+  );
 
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
+  const todaySchedule =
+    useMemo(
+      () =>
+        sortBookingsByStartTime(
+          todayBookings
+        ),
+      [todayBookings]
+    );
+
+  const formattedRecentBookings =
+    useMemo(
+      () =>
+        recentBookings.slice(0, 5),
+      [recentBookings]
+    );
+
+  /* ------------------------------------------------------------------------ */
+  /* REFRESH                                                                  */
+  /* ------------------------------------------------------------------------ */
+
+  const handleRefresh = () => {
+    loadDashboard({
+      refresh: true,
+    });
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /* RENDER                                                                   */
+  /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="min-h-screen">
-      {/* =========================
-          HEADER
-      ========================= */}
-
-      <header className="border-b border-white/[0.07] bg-[#050A14]/80 backdrop-blur-xl">
-        <div className="flex min-h-20 items-center justify-between gap-4 px-6 lg:px-10">
-          <div className="pl-12 lg:pl-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-500">
-              Overview
+    <div className="min-h-screen bg-[#050A14]">
+      <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {/* Header */}
+        <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-400">
+              Checkpoint Admin
             </p>
 
-            <h1 className="mt-1 text-xl font-bold">
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
               Dashboard
             </h1>
+
+            <p className="mt-2 text-sm text-white/40">
+              {formattedDate}
+            </p>
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4">
-            <button
-              type="button"
-              onClick={() =>
-                fetchDashboard(true)
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={
+              loading || refreshing
+            }
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-white/70 transition hover:border-blue-400/20 hover:bg-blue-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FiRefreshCw
+              size={15}
+              className={
+                refreshing
+                  ? "animate-spin"
+                  : ""
               }
-              disabled={refreshing}
-              className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition hover:border-blue-500/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FiRefreshCw
-                size={14}
-                className={
-                  refreshing
-                    ? "animate-spin"
-                    : ""
-                }
-              />
-
-              <span className="hidden sm:inline">
-                Refresh
-              </span>
-            </button>
-
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold">
-                Administrator
-              </p>
-
-              <p className="text-xs text-slate-600">
-                Cinema Management
-              </p>
-            </div>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-500/20 bg-blue-500/10 text-sm font-bold text-blue-400">
-              A
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* =========================
-          MAIN
-      ========================= */}
-
-      <main className="px-6 py-8 lg:px-10 lg:py-10">
-        {/* ERROR */}
-
-        {error && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-4">
-            <FiAlertCircle
-              size={18}
-              className="mt-0.5 shrink-0 text-red-400"
             />
 
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-red-300">
-                Dashboard data could not
-                be loaded
-              </p>
+            {refreshing
+              ? "Refreshing..."
+              : "Refresh"}
+          </button>
+        </header>
 
-              <p className="mt-1 text-xs text-red-300/60">
-                {error}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                fetchDashboard(true)
-              }
-              className="shrink-0 rounded-lg border border-red-500/20 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10"
-            >
-              Retry
-            </button>
+        {/* Error */}
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-300">
+            {error}
           </div>
         )}
 
-        {/* =========================
-            INTRO
-        ========================= */}
-
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm text-slate-500">
-              Welcome back.
-            </p>
-
-            <h2 className="mt-1 text-3xl font-black tracking-tight">
-              Cinema Overview
-            </h2>
-
-            <p className="mt-2 text-xs text-slate-600">
-              Live data from your cinema
-              system
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <FiActivity
-              size={14}
-              className="text-emerald-400"
-            />
-
-            System connected
-          </div>
-        </div>
-
-        {/* =========================
-            STATS
-        ========================= */}
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-
-            return (
-              <div
-                key={stat.title}
-                className="group rounded-2xl border border-white/[0.07] bg-[#07101c]/70 p-5 transition hover:border-blue-500/20 hover:bg-[#07101c]"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
-                    <Icon size={19} />
-                  </div>
-
-                  <FiArrowUpRight
-                    size={18}
-                    className="text-slate-700 transition group-hover:text-blue-400"
-                  />
-                </div>
-
-                <p className="mt-6 text-xs text-slate-500">
-                  {stat.title}
-                </p>
-
-                <h3 className="mt-1 text-3xl font-black">
-                  {stat.value}
-                </h3>
-
-                <p className="mt-2 text-[11px] text-slate-600">
-                  {stat.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* =========================
-            HALL INFORMATION
-        ========================= */}
-
-        <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#07101c]/70 p-5">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
-                <FiMonitor size={20} />
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-                  Cinema
-                </p>
-
-                <h3 className="mt-1 text-lg font-bold">
-                  {HALL_NAME}
-                </h3>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-3 text-center">
-                <p className="text-lg font-black text-white">
-                  {HALL_CAPACITY}
-                </p>
-
-                <p className="text-[10px] text-slate-600">
-                  Seats
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-3 text-center">
-                <p className="text-lg font-black text-white">
-                  {HALL_ROWS}
-                </p>
-
-                <p className="text-[10px] text-slate-600">
-                  Rows
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-3 text-center">
-                <p className="text-lg font-black text-white">
-                  {SEATS_PER_ROW}
-                </p>
-
-                <p className="text-[10px] text-slate-600">
-                  Per Row
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* =========================
-            CONTENT GRID
-        ========================= */}
-
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
-          {/* =========================
-              UPCOMING SHOWS
-          ========================= */}
-
-          <section className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#07101c]/70">
-            <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-                  Schedule
-                </p>
-
-                <h3 className="mt-1 text-lg font-bold">
-                  Upcoming Shows
-                </h3>
-              </div>
-
-              <Link
-                href="/admin/showtimes"
-                className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-slate-500 transition hover:border-blue-500/30 hover:text-white"
-              >
-                <FiCalendar size={13} />
-
-                Manage
-              </Link>
-            </div>
-
-            {upcomingShows.length ===
-            0 ? (
-              <EmptyState
-                icon={FiClock}
-                title="No upcoming shows"
-                description="Create a showtime to see it here."
-                href="/admin/showtimes"
-                action="Create Showtime"
-              />
-            ) : (
-              <div className="divide-y divide-white/[0.05]">
-                {upcomingShows.map(
-                  (showtime) => (
-                    <div
-                      key={
-                        showtime._id
-                      }
-                      className="flex items-center justify-between gap-4 px-5 py-5 transition hover:bg-white/[0.02]"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="truncate text-sm font-semibold text-white">
-                            {showtime
-                              .movieId
-                              ?.title ||
-                              "Unknown Movie"}
-                          </h4>
-
-                          {showtime.date ===
-                            today && (
-                            <span className="shrink-0 rounded-md bg-blue-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-400">
-                              Today
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-1 text-xs text-slate-600">
-                          {showtime
-                            .hallId
-                            ?.name ||
-                            HALL_NAME}{" "}
-                          ·{" "}
-                          {formatDate(
-                            showtime.date
-                          )}
-                        </p>
-
-                        <p className="mt-2 text-[11px] text-slate-700">
-                          Ticket price: ৳
-                          {Number(
-                            showtime.ticketPrice ||
-                              0
-                          ).toLocaleString()}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-blue-400">
-                          {formatTime(
-                            showtime.startTime
-                          )}
-                        </p>
-
-                        <p className="mt-1 text-[11px] text-slate-600">
-                          {HALL_CAPACITY}{" "}
-                          seats
-                        </p>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* =========================
-              QUICK ACTIONS
-          ========================= */}
-
-          <section className="rounded-2xl border border-white/[0.07] bg-[#07101c]/70 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">
-              Quick Actions
-            </p>
-
-            <h3 className="mt-1 text-lg font-bold">
-              Manage Cinema
-            </h3>
-
-            <div className="mt-6 space-y-3">
-              <QuickAction
-                href="/admin/movies"
-                icon={FiFilm}
-                title="Manage Movies"
-                description="Add or update movies"
-              />
-
-              <QuickAction
-                href="/admin/showtimes"
-                icon={FiClock}
-                title="Manage Showtimes"
-                description="Schedule cinema shows"
-              />
-
-              <QuickAction
-                href="/admin/bookings"
-                icon={FiCalendar}
-                title="View Bookings"
-                description="Manage customer bookings"
-              />
-            </div>
-
-            {/* SYSTEM STATUS */}
-
-            <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.03] px-4 py-3">
-              <FiCheckCircle
-                size={14}
-                className="text-emerald-400"
-              />
-
-              <span className="text-[11px] text-slate-500">
-                Movies and showtimes loaded
-              </span>
-            </div>
-          </section>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-/* =========================
-   QUICK ACTION
-========================= */
-
-function QuickAction({
-  href,
-  icon: Icon,
-  title,
-  description,
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition hover:border-blue-500/20 hover:bg-blue-500/[0.04]"
-    >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-        <Icon size={17} />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-white">
-          {title}
-        </p>
-
-        <p className="mt-0.5 text-[11px] text-slate-600">
-          {description}
-        </p>
-      </div>
-
-      <FiArrowUpRight
-        size={16}
-        className="text-slate-700 transition group-hover:text-blue-400"
-      />
-    </Link>
-  );
-}
-
-/* =========================
-   EMPTY STATE
-========================= */
-
-function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  href,
-  action,
-}) {
-  return (
-    <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.04] text-slate-600">
-        <Icon size={20} />
-      </div>
-
-      <p className="mt-4 text-sm font-semibold text-slate-300">
-        {title}
-      </p>
-
-      <p className="mt-1 max-w-xs text-xs text-slate-600">
-        {description}
-      </p>
-
-      {href && action && (
-        <Link
-          href={href}
-          className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500"
-        >
-          {action}
-        </Link>
-      )}
-    </div>
-  );
-}
-
-/* =========================
-   LOADING SKELETON
-========================= */
-
-function DashboardSkeleton() {
-  return (
-    <div className="min-h-screen animate-pulse">
-      <header className="h-20 border-b border-white/[0.07] bg-[#050A14]/80" />
-
-      <main className="px-6 py-8 lg:px-10">
-        <div className="mb-8">
-          <div className="h-3 w-24 rounded bg-white/[0.06]" />
-
-          <div className="mt-3 h-8 w-56 rounded bg-white/[0.06]" />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[1, 2, 3, 4].map(
+        {/* Main statistics */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {dashboardStats.map(
             (item) => (
-              <div
-                key={item}
-                className="h-40 rounded-2xl border border-white/[0.07] bg-[#07101c]/70"
+              <StatCard
+                key={item.label}
+                item={item}
               />
             )
           )}
+        </section>
+
+        {/* Facility Overview */}
+        <section className="mt-8">
+          <SectionHeader
+            title="Facility Overview"
+            description="Current usage across Checkpoint facilities"
+            action={
+              <span className="text-xs text-white/30">
+                {loading
+                  ? "Loading..."
+                  : `Updated ${lastUpdated.toLocaleTimeString(
+                      "en-US",
+                      {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      }
+                    )}`}
+              </span>
+            }
+          />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {facilities.length ===
+            0 ? (
+              <div className="rounded-2xl border border-white/10 bg-[#07101D] p-5 text-sm text-white/40 sm:col-span-2 xl:col-span-3">
+                {loading
+                  ? "Loading facility availability..."
+                  : "No facilities available."}
+              </div>
+            ) : (
+              facilities.map(
+                (facility) => {
+                  const Icon =
+                    facility.icon;
+
+                  const percentage =
+                    getOccupancyPercentage(
+                      facility.booked,
+                      facility.capacity
+                    );
+
+                  return (
+                    <div
+                      key={
+                        facility.id
+                      }
+                      className="rounded-2xl border border-white/10 bg-[#07101D] p-5"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-blue-400">
+                            <Icon
+                              size={18}
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <h3 className="truncate text-sm font-semibold text-white">
+                              {
+                                facility.name
+                              }
+                            </h3>
+
+                            <p className="mt-0.5 text-xs text-white/35">
+                              {
+                                facility.type
+                              }
+                            </p>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${getStatusClasses(
+                            facility.status
+                          )}`}
+                        >
+                          {
+                            facility.status
+                          }
+                        </span>
+                      </div>
+
+                      <div className="mt-6">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/40">
+                            Occupancy
+                          </span>
+
+                          <span className="font-medium text-white/70">
+                            {
+                              facility.booked
+                            }{" "}
+                            /{" "}
+                            {
+                              facility.capacity
+                            }
+                          </span>
+                        </div>
+
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5">
+                          <div
+                            className="h-full rounded-full bg-blue-500 transition-all"
+                            style={{
+                              width: `${percentage}%`,
+                            }}
+                          />
+                        </div>
+
+                        <p className="mt-2 text-[11px] text-white/30">
+                          {
+                            percentage
+                          }
+                          % occupied
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              )
+            )}
+          </div>
+        </section>
+
+        {/* Today's Schedule */}
+        <section className="mt-8">
+          <div className="rounded-2xl border border-white/10 bg-[#07101D] p-5 sm:p-6">
+            <SectionHeader
+              title="Today's Schedule"
+              description="Upcoming activity for today"
+              action={
+                <Link
+                  href="/admin/bookings"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-400 transition hover:text-blue-300"
+                >
+                  View all
+                  <FiArrowUpRight
+                    size={14}
+                  />
+                </Link>
+              }
+            />
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[650px]">
+                <div className="grid grid-cols-[110px_minmax(150px,1fr)_minmax(150px,1fr)_100px_100px] gap-4 border-b border-white/10 px-3 pb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/30">
+                  <span>
+                    Time
+                  </span>
+
+                  <span>
+                    Service
+                  </span>
+
+                  <span>
+                    Customer
+                  </span>
+
+                  <span>
+                    Usage
+                  </span>
+
+                  <span>
+                    Status
+                  </span>
+                </div>
+
+                <div className="divide-y divide-white/[0.06]">
+                  {loading &&
+                  todaySchedule.length ===
+                    0 ? (
+                    <div className="px-3 py-8 text-center text-sm text-white/35">
+                      Loading today's
+                      schedule...
+                    </div>
+                  ) : todaySchedule.length ===
+                    0 ? (
+                    <div className="px-3 py-8 text-center text-sm text-white/35">
+                      No bookings
+                      scheduled for
+                      today.
+                    </div>
+                  ) : (
+                    todaySchedule.map(
+                      (item) => {
+                        const usage =
+                          getBookingUsage(
+                            item,
+                            facilityMap
+                          );
+
+                        const status =
+                          item.status ===
+                          "confirmed"
+                            ? usage.status ===
+                              "Booked"
+                              ? "Booked"
+                              : "Confirmed"
+                            : item.status ===
+                              "pending"
+                            ? "Pending"
+                            : item.status ===
+                              "cancelled"
+                            ? "Cancelled"
+                            : "Completed";
+
+                        return (
+                          <div
+                            key={
+                              item.id
+                            }
+                            className="grid grid-cols-[110px_minmax(150px,1fr)_minmax(150px,1fr)_100px_100px] items-center gap-4 px-3 py-4"
+                          >
+                            <span className="text-sm font-medium text-white/80">
+                              {formatTime(
+                                item.startTime
+                              )}
+                            </span>
+
+                            <span className="truncate text-sm text-white/70">
+                              {
+                                item
+                                  .service
+                                  ?.name
+                              }
+                            </span>
+
+                            <span className="truncate text-sm text-white/40">
+                              {
+                                item
+                                  .customer
+                                  ?.name
+                              }
+                            </span>
+
+                            <span className="text-xs text-white/50">
+                              {
+                                usage.usage
+                              }
+                            </span>
+
+                            <span
+                              className={`w-fit rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getStatusClasses(
+                                status
+                              )}`}
+                            >
+                              {status}
+                            </span>
+                          </div>
+                        );
+                      }
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Recent Bookings */}
+        <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101D] p-5 sm:p-6">
+          <SectionHeader
+            title="Recent Bookings"
+            description="Latest Checkpoint bookings"
+            action={
+              <Link
+                href="/admin/bookings"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-400 transition hover:text-blue-300"
+              >
+                View all bookings
+                <FiArrowUpRight
+                  size={14}
+                />
+              </Link>
+            }
+          />
+
+          <div className="overflow-x-auto">
+            <div className="min-w-[760px]">
+              <div className="grid grid-cols-[110px_minmax(150px,1fr)_minmax(190px,1fr)_160px_110px_110px] gap-4 border-b border-white/10 px-3 pb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/30">
+                <span>ID</span>
+                <span>
+                  Customer
+                </span>
+                <span>
+                  Service
+                </span>
+                <span>
+                  Date & Time
+                </span>
+                <span>
+                  Amount
+                </span>
+                <span>
+                  Status
+                </span>
+              </div>
+
+              <div className="divide-y divide-white/[0.06]">
+                {loading &&
+                formattedRecentBookings.length ===
+                  0 ? (
+                  <div className="px-3 py-8 text-center text-sm text-white/35">
+                    Loading recent
+                    bookings...
+                  </div>
+                ) : formattedRecentBookings.length ===
+                  0 ? (
+                  <div className="px-3 py-8 text-center text-sm text-white/35">
+                    No bookings
+                    found.
+                  </div>
+                ) : (
+                  formattedRecentBookings.map(
+                    (booking) => {
+                      const status =
+                        booking.status
+                          ? booking.status
+                              .charAt(
+                                0
+                              )
+                              .toUpperCase() +
+                            booking.status.slice(
+                              1
+                            )
+                          : "Unknown";
+
+                      return (
+                        <div
+                          key={
+                            booking.id
+                          }
+                          className="grid grid-cols-[110px_minmax(150px,1fr)_minmax(190px,1fr)_160px_110px_110px] items-center gap-4 px-3 py-4"
+                        >
+                          <span className="text-xs font-medium text-blue-400">
+                            #
+                            {
+                              booking.bookingReference
+                            }
+                          </span>
+
+                          <span className="truncate text-sm text-white/75">
+                            {
+                              booking
+                                .customer
+                                ?.name
+                            }
+                          </span>
+
+                          <span className="truncate text-sm text-white/50">
+                            {
+                              booking
+                                .service
+                                ?.name
+                            }
+                          </span>
+
+                          <span className="text-xs text-white/40">
+                            {formatBookingDateTime(
+                              booking
+                            )}
+                          </span>
+
+                          <span className="text-sm font-medium text-white/75">
+                            ৳
+                            {(
+                              Number(
+                                booking.totalAmount
+                              ) ||
+                              0
+                            ).toLocaleString(
+                              "en-BD"
+                            )}
+                          </span>
+
+                          <span
+                            className={`w-fit rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getStatusClasses(
+                              status
+                            )}`}
+                          >
+                            {
+                              status
+                            }
+                          </span>
+                        </div>
+                      );
+                    }
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Bottom system note */}
+        <div className="mt-6 flex items-center gap-2 px-1 text-xs text-white/25">
+          <FiCheckCircle size={13} />
+
+          <span>
+            Dashboard data is connected to
+            live booking, payment, facility,
+            and availability APIs.
+          </span>
         </div>
-
-        <div className="mt-6 h-28 rounded-2xl border border-white/[0.07] bg-[#07101c]/70" />
-
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
-          <div className="h-[500px] rounded-2xl border border-white/[0.07] bg-[#07101c]/70" />
-
-          <div className="h-[500px] rounded-2xl border border-white/[0.07] bg-[#07101c]/70" />
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
-

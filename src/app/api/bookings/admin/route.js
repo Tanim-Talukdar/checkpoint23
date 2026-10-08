@@ -1,397 +1,435 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import mongoose from "mongoose";
 
 import { connectDB } from "@/lib/mongodb";
-import Booking from "@/models/booking";
 import { requireAdmin } from "@/lib/requireAdmin";
+import Booking from "@/models/booking";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+const MAX_LIMIT = 100;
 
-  limit: z.coerce
-    .number()
-    .int()
-    .min(5)
-    .max(50)
-    .default(10),
+function jsonError(message, status = 400) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: message,
+    },
+    { status }
+  );
+}
 
-  search: z
-    .string()
-    .trim()
-    .max(100)
-    .default(""),
+function parsePositiveInteger(value, fallback) {
+  const number = Number.parseInt(value, 10);
 
-  movieId: z
-    .string()
-    .trim()
-    .default(""),
+  if (!Number.isFinite(number) || number < 1) {
+    return fallback;
+  }
 
-  showtimeId: z
-    .string()
-    .trim()
-    .default(""),
+  return number;
+}
 
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .or(z.literal(""))
-    .default(""),
+function normalizeDate(value) {
+  if (!value || typeof value !== "string") return null;
 
-  paymentStatus: z
-    .enum([
-      "all",
-      "pending",
-      "paid",
-      "failed",
-      "cancelled",
-    ])
-    .default("all"),
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
-  bookingStatus: z
-    .enum([
-      "all",
-      "pending",
-      "confirmed",
-      "cancelled",
-    ])
-    .default("all"),
-});
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+
+  const date = new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day)
+    )
+  );
+
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() !== Number(month) - 1 ||
+    date.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function getEndDate(date) {
+  const end = new Date(date);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return end;
+}
+
+function serializeBooking(booking) {
+  return {
+    id: booking._id.toString(),
+
+    bookingReference: booking.bookingReference,
+    bookingGroupReference: booking.bookingGroupReference,
+
+    customer: {
+      name: booking.customerName,
+      email: booking.customerEmail,
+      phone: booking.customerPhone,
+    },
+
+    facility: {
+      id: booking.facilityId?.toString() || "",
+      name: booking.facilityName,
+    },
+
+    service: {
+      id: booking.serviceId?.toString() || "",
+      name: booking.serviceName,
+    },
+
+    bookingDate: booking.bookingDate,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    durationMinutes: booking.durationMinutes,
+
+    quantity: booking.quantity,
+
+    movieName: booking.movieName || "",
+
+    priceAtBooking: booking.priceAtBooking,
+    totalAmount: booking.totalAmount,
+
+    status: booking.status,
+    paymentStatus: booking.paymentStatus,
+
+    paymentTransactionId:
+      booking.paymentTransactionId || "",
+
+    paymentValidationId:
+      booking.paymentValidationId || "",
+
+    paymentBankTransactionId:
+      booking.paymentBankTransactionId || "",
+
+    paymentCardType:
+      booking.paymentCardType || "",
+
+    paymentMethod:
+      booking.paymentMethod || "",
+
+    paymentInitiatedAt:
+      booking.paymentInitiatedAt || null,
+
+    paymentPaidAt:
+      booking.paymentPaidAt || null,
+
+    expiresAt:
+      booking.expiresAt || null,
+
+    checkedIn: booking.checkedIn,
+    checkedInAt: booking.checkedInAt || null,
+
+    checkedOut: booking.checkedOut,
+    checkedOutAt: booking.checkedOutAt || null,
+
+    cancelledAt:
+      booking.cancelledAt || null,
+
+    cancellationReason:
+      booking.cancellationReason || "",
+
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
+  };
+}
 
 export async function GET(request) {
   try {
-    // ADMIN ONLY
+    /*
+     * ---------------------------------------------------------
+     * ADMIN AUTHENTICATION
+     * ---------------------------------------------------------
+     */
+
     const auth = await requireAdmin();
 
     if (!auth.authenticated) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Unauthorized",
-        },
-        { status: 401 }
-      );
+      return jsonError("Unauthorized", 401);
     }
+
+    /*
+     * ---------------------------------------------------------
+     * DATABASE
+     * ---------------------------------------------------------
+     */
 
     await connectDB();
 
-    const { searchParams } = new URL(request.url);
+    /*
+     * ---------------------------------------------------------
+     * QUERY PARAMETERS
+     *
+     * Supported:
+     *
+     * ?page=1
+     * ?limit=50
+     * ?date=2026-10-10
+     * ?facilityId=...
+     * ?status=pending
+     * ?paymentStatus=paid
+     * ?search=tanim
+     * ---------------------------------------------------------
+     */
 
-    const parsed = querySchema.safeParse({
-      page: searchParams.get("page") || 1,
-      limit: searchParams.get("limit") || 10,
-      search: searchParams.get("search") || "",
-      movieId: searchParams.get("movieId") || "",
-      showtimeId: searchParams.get("showtimeId") || "",
-      date: searchParams.get("date") || "",
-      paymentStatus:
-        searchParams.get("paymentStatus") || "all",
-      bookingStatus:
-        searchParams.get("bookingStatus") || "all",
-    });
+    const { searchParams } =
+      new URL(request.url);
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid query parameters",
-        },
-        { status: 400 }
-      );
+    const page = Math.max(
+      1,
+      parsePositiveInteger(
+        searchParams.get("page"),
+        1
+      )
+    );
+
+    const limit = Math.min(
+      MAX_LIMIT,
+      parsePositiveInteger(
+        searchParams.get("limit"),
+        50
+      )
+    );
+
+    const dateParam =
+      searchParams.get("date")?.trim() || "";
+
+    const facilityId =
+      searchParams.get("facilityId")?.trim() || "";
+
+    const status =
+      searchParams.get("status")?.trim() || "";
+
+    const paymentStatus =
+      searchParams
+        .get("paymentStatus")
+        ?.trim() || "";
+
+    const search =
+      searchParams.get("search")?.trim() || "";
+
+    /*
+     * ---------------------------------------------------------
+     * BUILD QUERY
+     * ---------------------------------------------------------
+     */
+
+    const query = {};
+
+    /*
+     * DATE FILTER
+     */
+
+    if (dateParam) {
+      const startDate =
+        normalizeDate(dateParam);
+
+      if (!startDate) {
+        return jsonError(
+          "Invalid date. Use YYYY-MM-DD."
+        );
+      }
+
+      query.bookingDate = {
+        $gte: startDate,
+        $lt: getEndDate(startDate),
+      };
     }
 
-    const {
-      page,
-      limit,
-      search,
-      movieId,
-      showtimeId,
-      date,
-      paymentStatus,
-      bookingStatus,
-    } = parsed.data;
+    /*
+     * FACILITY FILTER
+     */
 
-    const filter = {};
+    if (facilityId) {
+      if (!mongoose.isValidObjectId(facilityId)) {
+        return jsonError(
+          "Invalid facility ID."
+        );
+      }
 
-    // Payment status
-    if (paymentStatus !== "all") {
-      filter.paymentStatus = paymentStatus;
+      query.facilityId =
+        new mongoose.Types.ObjectId(
+          facilityId
+        );
     }
 
-    // Booking status
-    if (bookingStatus !== "all") {
-      filter.bookingStatus = bookingStatus;
+    /*
+     * BOOKING STATUS FILTER
+     */
+
+    const allowedStatuses = new Set([
+      "pending",
+      "confirmed",
+      "completed",
+      "cancelled",
+    ]);
+
+    if (status) {
+      if (!allowedStatuses.has(status)) {
+        return jsonError(
+          "Invalid booking status."
+        );
+      }
+
+      query.status = status;
     }
 
-    // Movie filter
-    if (movieId) {
-      filter.movieId = movieId;
+    /*
+     * PAYMENT STATUS FILTER
+     */
+
+    const allowedPaymentStatuses =
+      new Set([
+        "unpaid",
+        "pending",
+        "paid",
+        "failed",
+        "refunded",
+      ]);
+
+    if (paymentStatus) {
+      if (
+        !allowedPaymentStatuses.has(
+          paymentStatus
+        )
+      ) {
+        return jsonError(
+          "Invalid payment status."
+        );
+      }
+
+      query.paymentStatus =
+        paymentStatus;
     }
 
-    // Showtime filter
-    if (showtimeId) {
-      filter.showtimeId = showtimeId;
-    }
+    /*
+     * SEARCH
+     *
+     * Search customer name/email/phone,
+     * booking reference and group reference.
+     */
 
-    // Date filter
-    if (date) {
-      filter["showtimeSnapshot.date"] = date;
-    }
-
-    // Server-side search
     if (search) {
-      filter.$or = [
-        {
-          "customer.name": {
-            $regex: search,
-            $options: "i",
-          },
-        },
+      const escapedSearch =
+        search.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        );
 
-        {
-          "customer.email": {
-            $regex: search,
-            $options: "i",
-          },
-        },
+      const regex = new RegExp(
+        escapedSearch,
+        "i"
+      );
 
+      query.$or = [
         {
-          "customer.phone": {
-            $regex: search,
-            $options: "i",
-          },
+          bookingReference: regex,
         },
-
         {
-          "payment.tranId": {
-            $regex: search,
-            $options: "i",
-          },
+          bookingGroupReference: regex,
         },
-
         {
-          "payment.bankTranId": {
-            $regex: search,
-            $options: "i",
-          },
+          customerName: regex,
         },
-
         {
-          "movieSnapshot.title": {
-            $regex: search,
-            $options: "i",
-          },
+          customerEmail: regex,
         },
-
         {
-          "showtimeSnapshot.date": {
-            $regex: search,
-            $options: "i",
-          },
+          customerPhone: regex,
         },
-
         {
-          "showtimeSnapshot.startTime": {
-            $regex: search,
-            $options: "i",
-          },
+          facilityName: regex,
         },
-
         {
-          seats: {
-            $regex: search,
-            $options: "i",
-          },
+          serviceName: regex,
         },
       ];
     }
 
+    /*
+     * ---------------------------------------------------------
+     * PAGINATION
+     * ---------------------------------------------------------
+     */
+
     const skip = (page - 1) * limit;
 
-    const [payments, total] = await Promise.all([
-      Booking.find(filter)
-        .populate(
-          "movieId",
-          "title poster backdrop duration rating"
-        )
-        .populate(
-          "showtimeId",
-          "date startTime ticketPrice"
-        )
-        .populate(
-          "hallId",
-          "name capacity rows seatsPerRow seats"
-        )
-        .sort({
-          createdAt: -1,
-        })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+    /*
+     * ---------------------------------------------------------
+     * FETCH BOOKINGS + TOTAL COUNT
+     * ---------------------------------------------------------
+     *
+     * Promise.all keeps both database operations
+     * running concurrently.
+     */
 
-      Booking.countDocuments(filter),
-    ]);
+    const [bookings, total] =
+      await Promise.all([
+        Booking.find(query)
+          .sort({
+            createdAt: -1,
+          })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
 
-    // Snapshot first, populated data as fallback.
-    const formattedPayments = payments.map(
-      (booking) => ({
-        ...booking,
+        Booking.countDocuments(query),
+      ]);
 
-        movie:
-          booking.movieSnapshot ||
-          booking.movieId ||
-          null,
+    /*
+     * ---------------------------------------------------------
+     * RESPONSE
+     * ---------------------------------------------------------
+     */
 
-        showtime:
-          booking.showtimeSnapshot ||
-          booking.showtimeId ||
-          null,
-      })
-    );
-
-    // Overall statistics
-    const statsResult = await Booking.aggregate([
-      {
-        $group: {
-          _id: null,
-
-          totalBookings: {
-            $sum: 1,
-          },
-
-          paidCount: {
-            $sum: {
-              $cond: [
-                {
-                  $eq: [
-                    "$paymentStatus",
-                    "paid",
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-
-          pendingCount: {
-            $sum: {
-              $cond: [
-                {
-                  $eq: [
-                    "$paymentStatus",
-                    "pending",
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-
-          failedCount: {
-            $sum: {
-              $cond: [
-                {
-                  $eq: [
-                    "$paymentStatus",
-                    "failed",
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-
-          cancelledCount: {
-            $sum: {
-              $cond: [
-                {
-                  $eq: [
-                    "$paymentStatus",
-                    "cancelled",
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-
-          totalRevenue: {
-            $sum: {
-              $cond: [
-                {
-                  $eq: [
-                    "$paymentStatus",
-                    "paid",
-                  ],
-                },
-                "$totalAmount",
-                0,
-              ],
-            },
-          },
-        },
-      },
-    ]);
-
-    const stats = statsResult[0] || {
-      totalBookings: 0,
-      paidCount: 0,
-      pendingCount: 0,
-      failedCount: 0,
-      cancelledCount: 0,
-      totalRevenue: 0,
-    };
+    const totalPages =
+      Math.ceil(total / limit);
 
     return NextResponse.json({
       success: true,
 
-      payments: formattedPayments,
+      data: bookings.map(
+        serializeBooking
+      ),
 
       pagination: {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages,
+        hasNextPage:
+          page < totalPages,
+        hasPreviousPage:
+          page > 1,
       },
 
-      stats: {
-        totalBookings:
-          stats.totalBookings || 0,
-
-        paidCount:
-          stats.paidCount || 0,
-
-        pendingCount:
-          stats.pendingCount || 0,
-
-        failedCount:
-          stats.failedCount || 0,
-
-        cancelledCount:
-          stats.cancelledCount || 0,
-
-        totalRevenue:
-          stats.totalRevenue || 0,
+      filters: {
+        date: dateParam || null,
+        facilityId: facilityId || null,
+        status: status || null,
+        paymentStatus:
+          paymentStatus || null,
+        search: search || null,
       },
     });
   } catch (error) {
     console.error(
-      "GET admin payments error:",
+      "Admin bookings API error:",
       error
     );
 
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Failed to fetch payment data",
-      },
-      { status: 500 }
+    return jsonError(
+      "Unable to load bookings.",
+      500
     );
   }
 }

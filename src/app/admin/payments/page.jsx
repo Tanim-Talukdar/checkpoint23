@@ -1,1096 +1,1401 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+
 import {
-FiCreditCard,
-FiDollarSign,
-FiDownload,
-FiEye,
-FiRefreshCw,
-FiSearch,
-FiX,
-} from "react-icons/fi";
-
-const statusStyles = {
-paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-failed: "bg-red-500/10 text-red-400 border-red-500/20",
-cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
-confirmed:
-"bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-};
-
-function formatMoney(amount) {
-return `৳${Number(amount || 0).toLocaleString("en-BD")}`;
-}
-
-function formatDate(date) {
-if (!date) return "—";
-
-try {
-return new Date(date).toLocaleString("en-BD", {
-day: "2-digit",
-month: "short",
-year: "numeric",
-hour: "2-digit",
-minute: "2-digit",
-});
-} catch {
-return "—";
-}
-}
-
-function formatShowDate(date) {
-if (!date) return "—";
-
-try {
-return new Date(date).toLocaleDateString("en-BD", {
-day: "2-digit",
-month: "short",
-year: "numeric",
-});
-} catch {
-return String(date);
-}
-}
-
-function StatusBadge({ status }) {
-const value = status || "pending";
-
-return (
-<span
-className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize ${
-        statusStyles[value] ||
-        "border-white/10 bg-white/5 text-white/60"
-      }`}
->
-{value} </span>
-);
-}
-
-function StatCard({ title, value, icon: Icon }) {
-return ( <div className="rounded-2xl border border-white/[0.07] bg-[#080F1C] p-5"> <div className="flex items-start justify-between"> <div> <p className="text-xs font-medium uppercase tracking-wider text-white/35">
-{title} </p>
-
-      <p className="mt-3 text-2xl font-bold text-white">
-        {value}
-      </p>
-    </div>
-
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
-      <Icon size={19} />
-    </div>
-  </div>
-</div>
-
-
-);
-}
-
-function getMovieName(payment) {
-return (
-payment?.movie?.title ||
-payment?.movieSnapshot?.title ||
-payment?.movieId?.title ||
-payment?.manualMovieName ||
-payment?.movieName ||
-"Movie Name"
-);
-}
-
-function getDate(payment) {
-return (
-payment?.showtime?.date ||
-payment?.showtimeSnapshot?.date ||
-payment?.showtimeId?.date ||
-payment?.date ||
-""
-);
-}
-
-function getTime(payment) {
-return (
-payment?.showtime?.startTime ||
-payment?.showtimeSnapshot?.startTime ||
-payment?.showtimeId?.startTime ||
-payment?.time ||
-"—"
-);
-}
-
-function getHall(payment) {
-return (
-payment?.hall?.name ||
-payment?.hallName ||
-payment?.hallId?.name ||
-"—"
-);
-}
-
-function getCustomer(payment) {
-return {
-name:
-payment?.customer?.name ||
-payment?.customerName ||
-"—",
-
-
-email:
-  payment?.customer?.email ||
-  payment?.email ||
-  "—",
-
-phone:
-  payment?.customer?.phone ||
-  payment?.phone ||
-  "—",
-
-
-};
-}
-
-function getSeats(payment) {
-if (payment?.bookingType === "full-hall") {
-return "Full Hall";
-}
-
-if (
-Array.isArray(payment?.seats) &&
-payment.seats.length > 0
-) {
-return payment.seats.join(", ");
-}
-
-return "—";
-}
-
-function getBookingType(payment) {
-return payment?.bookingType === "full-hall"
-? "Full Hall"
-: "Seat";
-}
-
-function getRecordType(payment) {
-return payment?.recordType === "manual"
-? "Manual"
-: "Online";
-}
-
-function getPaymentMethod(payment) {
-return (
-payment?.payment?.paymentMethod ||
-payment?.paymentMethod ||
-(payment?.recordType === "manual"
-? "Cash"
-: "Online")
-);
-}
-
-function InfoItem({ label, value }) {
-return ( <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"> <p className="text-[10px] uppercase tracking-wider text-white/30">
-{label} </p>
-
-  <p className="mt-1.5 break-words text-sm text-white/75">
-    {value || "—"}
-  </p>
-</div>
-
-
-);
-}
-
-function PaymentDetails({ payment, onClose }) {
-if (!payment) return null;
-
-const customer = getCustomer(payment);
-
-return ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"> <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-[#080F1C] shadow-2xl"> <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.07] bg-[#080F1C] px-6 py-5"> <div> <h2 className="text-lg font-semibold text-white">
-Payment Details </h2>
-
-
-        <p className="mt-1 text-xs text-white/35">
-          {payment.bookingId ||
-            payment._id ||
-            "Booking"}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/5 hover:text-white"
-      >
-        <FiX size={19} />
-      </button>
-    </div>
-
-    <div className="space-y-6 p-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">
-            Type
-          </p>
-
-          <p className="mt-2 text-sm font-medium text-white">
-            {getRecordType(payment)}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">
-            Booking
-          </p>
-
-          <p className="mt-2 text-sm font-medium text-white">
-            {getBookingType(payment)}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">
-            Payment
-          </p>
-
-          <div className="mt-2">
-            <StatusBadge
-              status={payment.paymentStatus}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-white/30">
-            Booking Status
-          </p>
-
-          <div className="mt-2">
-            <StatusBadge
-              status={payment.bookingStatus}
-            />
-          </div>
-        </div>
-      </div>
-
-      <section>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/35">
-          Customer
-        </h3>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <InfoItem
-            label="Name"
-            value={customer.name}
-          />
-
-          <InfoItem
-            label="Email"
-            value={customer.email}
-          />
-
-          <InfoItem
-            label="Phone"
-            value={customer.phone}
-          />
-        </div>
-      </section>
-
-      <section>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/35">
-          Booking
-        </h3>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <InfoItem
-            label="Movie"
-            value={getMovieName(payment)}
-          />
-
-          <InfoItem
-            label="Hall"
-            value={getHall(payment)}
-          />
-
-          <InfoItem
-            label="Date"
-            value={formatShowDate(
-              getDate(payment)
-            )}
-          />
-
-          <InfoItem
-            label="Time"
-            value={getTime(payment)}
-          />
-
-          <InfoItem
-            label="Seats"
-            value={getSeats(payment)}
-          />
-
-          <InfoItem
-            label="Amount"
-            value={formatMoney(
-              payment.totalAmount
-            )}
-          />
-        </div>
-      </section>
-
-      <section>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/35">
-          Payment Information
-        </h3>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <InfoItem
-            label="Payment Method"
-            value={getPaymentMethod(payment)}
-          />
-
-          <InfoItem
-            label="Transaction ID"
-            value={
-              payment?.payment?.tranId ||
-              "—"
-            }
-          />
-
-          <InfoItem
-            label="Bank Transaction ID"
-            value={
-              payment?.payment?.bankTranId ||
-              "—"
-            }
-          />
-
-          <InfoItem
-            label="Validation ID"
-            value={
-              payment?.payment?.valId ||
-              "—"
-            }
-          />
-        </div>
-      </section>
-
-      {payment.notes && (
-        <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/35">
-            Notes
-          </h3>
-
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm leading-6 text-white/60">
-            {payment.notes}
-          </div>
-        </section>
-      )}
-
-      <section>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/35">
-          Timestamps
-        </h3>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <InfoItem
-            label="Created"
-            value={formatDate(
-              payment.createdAt
-            )}
-          />
-
-          <InfoItem
-            label="Updated"
-            value={formatDate(
-              payment.updatedAt
-            )}
-          />
-        </div>
-      </section>
-    </div>
-  </div>
-</div>
-
-
-);
-}
-
-export default function AdminPaymentsPage() {
-const [payments, setPayments] = useState([]);
-
-const [stats, setStats] = useState({
-totalBookings: 0,
-paidCount: 0,
-pendingCount: 0,
-failedCount: 0,
-cancelledCount: 0,
-totalRevenue: 0,
-});
-
-const [search, setSearch] = useState("");
-const [paymentStatus, setPaymentStatus] =
-useState("all");
-const [bookingStatus, setBookingStatus] =
-useState("all");
-
-const [page, setPage] = useState(1);
-
-const [pagination, setPagination] =
-useState({
-page: 1,
-limit: 10,
-total: 0,
-totalPages: 1,
-});
-
-const [loading, setLoading] = useState(true);
-const [exporting, setExporting] =
-useState(false);
-
-const [error, setError] = useState("");
-const [selectedPayment, setSelectedPayment] =
-useState(null);
-
-const fetchPayments = useCallback(
-async () => {
-try {
-setLoading(true);
-setError("");
-
-
-    const params =
-      new URLSearchParams();
-
-    params.set("page", String(page));
-    params.set("limit", "10");
-    params.set("search", search);
-    params.set(
-      "paymentStatus",
-      paymentStatus
-    );
-    params.set(
-      "bookingStatus",
-      bookingStatus
-    );
-
-    const response = await fetch(
-      `/api/payment?${params.toString()}`,
-      {
-        method: "GET",
-        cache: "no-store",
-      }
-    );
-
-    const data =
-      await response.json();
-
-    if (
-      !response.ok ||
-      !data.success
-    ) {
-      throw new Error(
-        data.message ||
-          "Failed to fetch payments"
-      );
-    }
-
-    setPayments(
-      data.payments || []
-    );
-
-    setPagination(
-      data.pagination || {
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 1,
-      }
-    );
-
-    setStats(
-      data.stats || {
-        totalBookings: 0,
-        paidCount: 0,
-        pendingCount: 0,
-        failedCount: 0,
-        cancelledCount: 0,
-        totalRevenue: 0,
-      }
-    );
-  } catch (err) {
-    console.error(err);
-
-    setError(
-      err.message ||
-        "Failed to fetch payments"
-    );
-
-    setPayments([]);
-  } finally {
-    setLoading(false);
+  MdArrowBack,
+  MdCheckCircle,
+  MdClose,
+  MdContentCopy,
+  MdErrorOutline,
+  MdInfoOutline,
+  MdPayment,
+  MdRefresh,
+  MdSearch,
+  MdTrendingUp,
+  MdWarning,
+} from "react-icons/md";
+
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const formatCurrency = (amount) =>
+  `৳${Number(amount || 0).toLocaleString("en-BD")}`;
+
+const formatDate = (date) => {
+  if (!date) return "—";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
   }
-},
-[
-  page,
-  search,
-  paymentStatus,
-  bookingStatus,
-]
 
+  return parsedDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
+const formatDateTime = (date) => {
+  if (!date) return "—";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const getStatusClasses = (status) => {
+  switch (status) {
+    case "Paid":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+
+    case "Pending":
+      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+
+    case "Failed":
+      return "border-red-400/20 bg-red-400/10 text-red-300";
+
+    case "Refunded":
+      return "border-violet-400/20 bg-violet-400/10 text-violet-300";
+
+    default:
+      return "border-white/10 bg-white/[0.04] text-gray-400";
+  }
+};
+
+const getStatusIcon = (status) => {
+  switch (status) {
+    case "Paid":
+      return MdCheckCircle;
+
+    case "Pending":
+      return MdWarning;
+
+    case "Failed":
+      return MdErrorOutline;
+
+    case "Refunded":
+      return MdRefresh;
+
+    default:
+      return MdInfoOutline;
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* PAGE                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export default function PaymentsPage() {
+  const [transactions, setTransactions] = useState([]);
+
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All Statuses");
+  const [type, setType] = useState("All Types");
+  const [method, setMethod] = useState("All Methods");
+
+  const [selectedTransaction, setSelectedTransaction] =
+    useState(null);
+
+  const [toast, setToast] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  /* ------------------------------------------------------------------------ */
+  /* LOAD TRANSACTIONS                                                        */
+  /* ------------------------------------------------------------------------ */
+
+  const loadTransactions = useCallback(
+    async (showRefreshState = false) => {
+      try {
+        if (showRefreshState) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        setError("");
+
+        const params = new URLSearchParams();
+
+        if (search.trim()) {
+          params.set(
+            "search",
+            search.trim()
+          );
+        }
+
+        if (
+          status &&
+          status !== "All Statuses"
+        ) {
+          params.set("status", status);
+        }
+
+        if (
+          type &&
+          type !== "All Types"
+        ) {
+          params.set("type", type);
+        }
+
+        if (
+          method &&
+          method !== "All Methods"
+        ) {
+          params.set("method", method);
+        }
+
+        const queryString =
+          params.toString();
+
+const response = await fetch(
+  `/api/payment${
+    queryString
+      ? `?${queryString}`
+      : ""
+  }`,
+  {
+    method: "GET",
+    cache: "no-store",
+  }
 );
 
-useEffect(() => {
-fetchPayments();
-}, [fetchPayments]);
+        const result =
+          await response.json();
 
-useEffect(() => {
-setPage(1);
-}, [
-search,
-paymentStatus,
-bookingStatus,
-]);
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.message ||
+              "Unable to load payments."
+          );
+        }
 
-async function downloadExcel() {
-try {
-setExporting(true);
+        setTransactions(
+          Array.isArray(
+            result.transactions
+          )
+            ? result.transactions
+            : []
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load payments:",
+          error
+        );
 
-  const params =
-    new URLSearchParams();
-
-  params.set("search", search);
-  params.set(
-    "paymentStatus",
-    paymentStatus
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load payments."
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [
+      search,
+      status,
+      type,
+      method,
+    ]
   );
-  params.set(
-    "bookingStatus",
-    bookingStatus
-  );
 
-  const response = await fetch(
-    `/api/payment/export?${params.toString()}`,
-    {
-      method: "GET",
-      cache: "no-store",
+  /* ------------------------------------------------------------------------ */
+  /* INITIAL LOAD + FILTER DEBOUNCE                                           */
+  /* ------------------------------------------------------------------------ */
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      loadTransactions(false);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [loadTransactions]);
+
+  /* ------------------------------------------------------------------------ */
+  /* SUMMARY                                                                  */
+  /* ------------------------------------------------------------------------ */
+
+  const summary = useMemo(() => {
+    const paidTransactions =
+      transactions.filter(
+        (transaction) =>
+          transaction.status === "Paid"
+      );
+
+    const pendingTransactions =
+      transactions.filter(
+        (transaction) =>
+          transaction.status === "Pending"
+      );
+
+    const failedTransactions =
+      transactions.filter(
+        (transaction) =>
+          transaction.status === "Failed"
+      );
+
+    const paidAmount =
+      paidTransactions.reduce(
+        (sum, transaction) =>
+          sum +
+          Number(
+            transaction.amount || 0
+          ),
+        0
+      );
+
+    const pendingAmount =
+      pendingTransactions.reduce(
+        (sum, transaction) =>
+          sum +
+          Number(
+            transaction.amount || 0
+          ),
+        0
+      );
+
+    return {
+      total: transactions.length,
+
+      paid: paidTransactions.length,
+
+      paidAmount,
+
+      pending:
+        pendingTransactions.length,
+
+      pendingAmount,
+
+      failed:
+        failedTransactions.length,
+    };
+  }, [transactions]);
+
+  /* ------------------------------------------------------------------------ */
+  /* TOAST                                                                    */
+  /* ------------------------------------------------------------------------ */
+
+  const showToast = (message) => {
+    setToast(message);
+
+    window.setTimeout(() => {
+      setToast("");
+    }, 2500);
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /* RESET FILTERS                                                            */
+  /* ------------------------------------------------------------------------ */
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatus("All Statuses");
+    setType("All Types");
+    setMethod("All Methods");
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /* REFRESH                                                                  */
+  /* ------------------------------------------------------------------------ */
+
+  const handleRefresh = async () => {
+    await loadTransactions(true);
+
+    showToast(
+      "Transactions refreshed."
+    );
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /* COPY                                                                     */
+  /* ------------------------------------------------------------------------ */
+
+  const handleCopy = async (value) => {
+    if (!value) {
+      showToast(
+        "Nothing available to copy."
+      );
+      return;
     }
-  );
-
-  if (!response.ok) {
-    let message =
-      "Failed to export payments";
 
     try {
-      const data =
-        await response.json();
+      if (
+        navigator.clipboard &&
+        typeof navigator.clipboard
+          .writeText === "function"
+      ) {
+        await navigator.clipboard.writeText(
+          value
+        );
 
-      message =
-        data.message || message;
-    } catch {}
+        showToast(
+          "Copied to clipboard."
+        );
 
-    throw new Error(message);
-  }
+        return;
+      }
 
-  const blob =
-    await response.blob();
+      showToast(
+        "Unable to copy."
+      );
+    } catch {
+      showToast(
+        "Unable to copy."
+      );
+    }
+  };
 
-  const url =
-    window.URL.createObjectURL(blob);
+  /* ------------------------------------------------------------------------ */
+  /* RENDER                                                                   */
+  /* ------------------------------------------------------------------------ */
 
-  const link =
-    document.createElement("a");
+  return (
+    <div className="min-h-screen bg-[#050A14] text-white">
+      {/* ------------------------------------------------------------------ */}
+      {/* HEADER                                                             */}
+      {/* ------------------------------------------------------------------ */}
 
-  link.href = url;
+      <header className="border-b border-white/[0.06] bg-[#050A14]/95 px-4 py-5 backdrop-blur-xl sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1600px]">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-start gap-3">
+              <Link
+                href="/admin"
+                className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] text-gray-400 transition hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white"
+                aria-label="Back to dashboard"
+              >
+                <MdArrowBack size={20} />
+              </Link>
 
-  link.download =
-    `checkpoint-payments-${new Date()
-      .toISOString()
-      .slice(0, 10)}.xls`;
+              <div>
+                <div className="mb-1 flex items-center gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-400">
+                    Finance
+                  </p>
 
-  document.body.appendChild(link);
+                  <span className="h-1 w-1 rounded-full bg-gray-700" />
 
-  link.click();
+                  <span className="text-[11px] uppercase tracking-[0.15em] text-gray-500">
+                    Payments
+                  </span>
+                </div>
 
-  link.remove();
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Payments & Transactions
+                </h1>
 
-  window.URL.revokeObjectURL(url);
-} catch (err) {
-  console.error(err);
+                <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                  View booking and membership
+                  payment transactions and
+                  their current gateway status.
+                </p>
+              </div>
+            </div>
 
-  alert(
-    err.message ||
-      "Failed to download Excel file"
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex h-10 w-fit items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 text-sm font-medium text-gray-300 transition hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <MdRefresh
+                size={18}
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              />
+
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MAIN                                                               */}
+      {/* ------------------------------------------------------------------ */}
+
+      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+        {/* SUMMARY */}
+
+        <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SummaryCard
+            icon={MdPayment}
+            label="Transactions"
+            value={summary.total}
+            description="Loaded from database"
+          />
+
+          <SummaryCard
+            icon={MdTrendingUp}
+            label="Paid Revenue"
+            value={formatCurrency(
+              summary.paidAmount
+            )}
+            description={`${summary.paid} successful payments`}
+          />
+
+          <SummaryCard
+            icon={MdWarning}
+            label="Pending"
+            value={formatCurrency(
+              summary.pendingAmount
+            )}
+            description={`${summary.pending} awaiting payment`}
+          />
+
+          <SummaryCard
+            icon={MdErrorOutline}
+            label="Failed"
+            value={summary.failed}
+            description="Unsuccessful payments"
+          />
+        </section>
+
+        {/* GATEWAY INFO */}
+
+        <section className="mb-6 rounded-2xl border border-blue-400/10 bg-blue-500/[0.04] p-4">
+          <div className="flex gap-3">
+            <div className="mt-0.5 shrink-0 text-blue-400">
+              <MdInfoOutline size={20} />
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-gray-200">
+                Payment gateway
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Customer bookings use SSLCommerz.
+                Payment status shown here comes
+                from the booking records updated by
+                the server-side payment flow.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ERROR */}
+
+        {error && (
+          <section className="mb-5 rounded-2xl border border-red-400/10 bg-red-500/[0.04] p-4">
+            <div className="flex items-start gap-3">
+              <MdErrorOutline
+                size={20}
+                className="mt-0.5 shrink-0 text-red-400"
+              />
+
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-red-300">
+                  Unable to load payments
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  {error}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* FILTERS */}
+
+        <section className="mb-5 rounded-2xl border border-white/[0.06] bg-[#07101C] p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(240px,1.6fr)_repeat(3,minmax(150px,1fr))_auto]">
+            <div className="relative">
+              <MdSearch
+                size={19}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-600"
+              />
+
+              <input
+                type="text"
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value
+                  )
+                }
+                placeholder="Search customer, transaction, booking..."
+                className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.025] pl-10 pr-4 text-sm text-gray-200 outline-none placeholder:text-gray-600 focus:border-blue-500/40"
+              />
+            </div>
+
+            <FilterSelect
+              value={status}
+              onChange={setStatus}
+              options={[
+                "All Statuses",
+                "Paid",
+                "Pending",
+                "Failed",
+                "Refunded",
+              ]}
+            />
+
+            <FilterSelect
+              value={type}
+              onChange={setType}
+              options={[
+                "All Types",
+                "Booking",
+                "Membership",
+              ]}
+            />
+
+            <FilterSelect
+              value={method}
+              onChange={setMethod}
+              options={[
+                "All Methods",
+                "SSLCommerz",
+              ]}
+            />
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="h-11 rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 text-xs font-semibold text-gray-400 transition hover:bg-white/[0.05] hover:text-white"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-[11px] text-gray-600">
+              Showing{" "}
+              <span className="font-medium text-gray-400">
+                {transactions.length}
+              </span>{" "}
+              transactions
+            </p>
+          </div>
+        </section>
+
+        {/* TABLE */}
+
+        <section className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#07101C]">
+          {loading ? (
+            <LoadingState />
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full min-w-[1100px]">
+                  <thead>
+                    <tr className="border-b border-white/[0.06] text-left">
+                      <TableHead>
+                        Transaction
+                      </TableHead>
+
+                      <TableHead>
+                        Customer
+                      </TableHead>
+
+                      <TableHead>
+                        Service
+                      </TableHead>
+
+                      <TableHead>
+                        Amount
+                      </TableHead>
+
+                      <TableHead>
+                        Method
+                      </TableHead>
+
+                      <TableHead>
+                        Status
+                      </TableHead>
+
+                      <TableHead>
+                        Date
+                      </TableHead>
+
+                      <TableHead align="right">
+                        Action
+                      </TableHead>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {transactions.map(
+                      (transaction) => (
+                        <TransactionRow
+                          key={
+                            transaction.id
+                          }
+                          transaction={
+                            transaction
+                          }
+                          onView={() =>
+                            setSelectedTransaction(
+                              transaction
+                            )
+                          }
+                        />
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* MOBILE */}
+
+              <div className="divide-y divide-white/[0.06] lg:hidden">
+                {transactions.map(
+                  (transaction) => (
+                    <MobileTransactionRow
+                      key={
+                        transaction.id
+                      }
+                      transaction={
+                        transaction
+                      }
+                      onView={() =>
+                        setSelectedTransaction(
+                          transaction
+                        )
+                      }
+                    />
+                  )
+                )}
+              </div>
+
+              {transactions.length ===
+                0 && <EmptyState />}
+            </>
+          )}
+        </section>
+      </main>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* DETAILS MODAL                                                      */}
+      {/* ------------------------------------------------------------------ */}
+
+      {selectedTransaction && (
+        <TransactionModal
+          transaction={
+            selectedTransaction
+          }
+          onClose={() =>
+            setSelectedTransaction(null)
+          }
+          onCopy={handleCopy}
+        />
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TOAST                                                              */}
+      {/* ------------------------------------------------------------------ */}
+
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2">
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-[#0A1624] px-4 py-3 text-sm font-medium text-gray-200 shadow-2xl shadow-black/40">
+            <MdCheckCircle
+              size={19}
+              className="text-emerald-400"
+            />
+
+            {toast}
+          </div>
+        </div>
+      )}
+    </div>
   );
-} finally {
-  setExporting(false);
 }
 
+/* -------------------------------------------------------------------------- */
+/* SUMMARY CARD                                                               */
+/* -------------------------------------------------------------------------- */
 
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  description,
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-[#07101C] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
+            {label}
+          </p>
+
+          <p className="mt-2 truncate text-xl font-semibold tracking-tight text-white sm:text-2xl">
+            {value}
+          </p>
+
+          <p className="mt-1 text-[11px] text-gray-600">
+            {description}
+          </p>
+        </div>
+
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.035] text-gray-400">
+          <Icon size={19} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function resetFilters() {
-setSearch("");
-setPaymentStatus("all");
-setBookingStatus("all");
-setPage(1);
+/* -------------------------------------------------------------------------- */
+/* TABLE HEAD                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function TableHead({
+  children,
+  align,
+}) {
+  return (
+    <th
+      className={`px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-600 ${
+        align === "right"
+          ? "text-right"
+          : ""
+      }`}
+    >
+      {children}
+    </th>
+  );
 }
 
-return ( <div className="min-h-screen bg-[#030712] text-white"> <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
-{/* Header */} <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"> <div> <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-Payments </h1>
+/* -------------------------------------------------------------------------- */
+/* DESKTOP ROW                                                                */
+/* -------------------------------------------------------------------------- */
 
-```
-        <p className="mt-2 text-sm text-white/40">
-          Manage movie booking payments
-          and transactions.
+function TransactionRow({
+  transaction,
+  onView,
+}) {
+  const StatusIcon =
+    getStatusIcon(
+      transaction.status
+    );
+
+  return (
+    <tr className="border-b border-white/[0.045] last:border-b-0">
+      <td className="px-5 py-4">
+        <p className="text-xs font-semibold text-gray-200">
+          {transaction.id}
+        </p>
+
+        <p className="mt-1 text-[10px] text-gray-600">
+          {transaction.bookingGroupReference}
+        </p>
+      </td>
+
+      <td className="px-5 py-4">
+        <p className="text-xs font-medium text-gray-300">
+          {transaction.customer}
+        </p>
+
+        <p className="mt-1 text-[10px] text-gray-600">
+          {transaction.phone}
+        </p>
+      </td>
+
+      <td className="px-5 py-4">
+        <p className="text-xs font-medium text-gray-300">
+          {transaction.service}
+        </p>
+
+        <p className="mt-1 text-[10px] text-gray-600">
+          {transaction.facility}
+        </p>
+      </td>
+
+      <td className="px-5 py-4">
+        <p className="text-sm font-semibold text-white">
+          {formatCurrency(
+            transaction.amount
+          )}
+        </p>
+      </td>
+
+      <td className="px-5 py-4">
+        <p className="text-xs text-gray-300">
+          {transaction.method}
+        </p>
+
+        <p className="mt-1 text-[10px] text-gray-600">
+          {transaction.gateway}
+        </p>
+      </td>
+
+      <td className="px-5 py-4">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${getStatusClasses(
+            transaction.status
+          )}`}
+        >
+          <StatusIcon size={13} />
+
+          {transaction.status}
+        </span>
+      </td>
+
+      <td className="px-5 py-4">
+        <p className="text-xs text-gray-400">
+          {formatDate(
+            transaction.date
+          )}
+        </p>
+
+        <p className="mt-1 text-[10px] text-gray-600">
+          {formatDateTime(
+            transaction.paymentDate
+          )}
+        </p>
+      </td>
+
+      <td className="px-5 py-4 text-right">
+        <button
+          type="button"
+          onClick={onView}
+          className="rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] font-semibold text-gray-400 transition hover:bg-white/[0.05] hover:text-white"
+        >
+          View
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* MOBILE ROW                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function MobileTransactionRow({
+  transaction,
+  onView,
+}) {
+  const StatusIcon =
+    getStatusIcon(
+      transaction.status
+    );
+
+  return (
+    <div className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-gray-200">
+            {transaction.id}
+          </p>
+
+          <p className="mt-1 truncate text-[10px] text-gray-600">
+            {transaction.bookingGroupReference}
+          </p>
+        </div>
+
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] ${getStatusClasses(
+            transaction.status
+          )}`}
+        >
+          <StatusIcon size={12} />
+
+          {transaction.status}
+        </span>
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-gray-300">
+            {transaction.customer}
+          </p>
+
+          <p className="mt-1 text-xs text-gray-600">
+            {transaction.service}
+          </p>
+        </div>
+
+        <p className="text-sm font-semibold text-white">
+          {formatCurrency(
+            transaction.amount
+          )}
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={downloadExcel}
-        disabled={exporting}
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {exporting ? (
-          <FiRefreshCw
-            size={17}
-            className="animate-spin"
-          />
-        ) : (
-          <FiDownload size={17} />
-        )}
+      <div className="mt-4 flex items-center justify-between border-t border-white/[0.05] pt-3">
+        <div>
+          <p className="text-[10px] text-gray-600">
+            {formatDate(
+              transaction.date
+            )}
+          </p>
 
-        {exporting
-          ? "Preparing..."
-          : "Download Excel"}
-      </button>
-    </div>
-
-    {/* Stats */}
-    <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-      <StatCard
-        title="Total Bookings"
-        value={stats.totalBookings}
-        icon={FiCreditCard}
-      />
-
-      <StatCard
-        title="Paid"
-        value={stats.paidCount}
-        icon={FiDollarSign}
-      />
-
-      <StatCard
-        title="Pending"
-        value={stats.pendingCount}
-        icon={FiCreditCard}
-      />
-
-      <StatCard
-        title="Failed"
-        value={stats.failedCount}
-        icon={FiCreditCard}
-      />
-
-      <StatCard
-        title="Cancelled"
-        value={stats.cancelledCount}
-        icon={FiCreditCard}
-      />
-
-      <StatCard
-        title="Revenue"
-        value={formatMoney(
-          stats.totalRevenue
-        )}
-        icon={FiDollarSign}
-      />
-    </div>
-
-    {/* Filters */}
-    <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#080F1C] p-4 sm:p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <FiSearch
-            size={17}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-          />
-
-          <input
-            type="text"
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-            placeholder="Search customer, phone, email, booking ID, transaction..."
-            className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/25 focus:border-blue-500/40"
-          />
+          <p className="mt-1 text-[10px] text-gray-600">
+            {transaction.gateway}
+          </p>
         </div>
 
-        <select
-          value={paymentStatus}
-          onChange={(e) =>
-            setPaymentStatus(
-              e.target.value
-            )
-          }
-          className="h-11 rounded-xl border border-white/[0.08] bg-[#080F1C] px-4 text-sm text-white/70 outline-none focus:border-blue-500/40"
-        >
-          <option value="all">
-            All Payment Status
-          </option>
-          <option value="paid">Paid</option>
-          <option value="pending">
-            Pending
-          </option>
-          <option value="failed">
-            Failed
-          </option>
-          <option value="cancelled">
-            Cancelled
-          </option>
-        </select>
-
-        <select
-          value={bookingStatus}
-          onChange={(e) =>
-            setBookingStatus(
-              e.target.value
-            )
-          }
-          className="h-11 rounded-xl border border-white/[0.08] bg-[#080F1C] px-4 text-sm text-white/70 outline-none focus:border-blue-500/40"
-        >
-          <option value="all">
-            All Booking Status
-          </option>
-          <option value="confirmed">
-            Confirmed
-          </option>
-          <option value="pending">
-            Pending
-          </option>
-          <option value="cancelled">
-            Cancelled
-          </option>
-        </select>
-
         <button
           type="button"
-          onClick={resetFilters}
-          className="h-11 rounded-xl border border-white/[0.08] px-4 text-sm text-white/50 transition hover:bg-white/5 hover:text-white"
+          onClick={onView}
+          className="rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] font-semibold text-gray-400 transition hover:bg-white/[0.05] hover:text-white"
         >
-          Reset
+          View Details
         </button>
       </div>
     </div>
+  );
+}
 
-    {/* Error */}
-    {error && (
-      <div className="mb-6 flex items-center justify-between rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">
-        <span>{error}</span>
+/* -------------------------------------------------------------------------- */
+/* FILTER SELECT                                                              */
+/* -------------------------------------------------------------------------- */
 
-        <button
-          type="button"
-          onClick={fetchPayments}
-          className="inline-flex items-center gap-2 text-xs font-medium text-white/60 hover:text-white"
+function FilterSelect({
+  value,
+  onChange,
+  options,
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) =>
+        onChange(
+          event.target.value
+        )
+      }
+      className="h-11 w-full appearance-none rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 text-xs text-gray-300 outline-none focus:border-blue-500/40"
+    >
+      {options.map((option) => (
+        <option
+          key={option}
+          value={option}
+          className="bg-[#07101C]"
         >
-          <FiRefreshCw size={14} />
-          Retry
-        </button>
+          {option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* LOADING STATE                                                              */
+/* -------------------------------------------------------------------------- */
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center">
+      <div className="text-center">
+        <MdRefresh
+          size={32}
+          className="mx-auto animate-spin text-blue-400"
+        />
+
+        <p className="mt-4 text-sm font-medium text-gray-300">
+          Loading transactions...
+        </p>
+
+        <p className="mt-1 text-xs text-gray-600">
+          Reading payment records from the database.
+        </p>
       </div>
-    )}
+    </div>
+  );
+}
 
-    {/* Table */}
-    <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#080F1C]">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px]">
-          <thead>
-            <tr className="border-b border-white/[0.07]">
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Customer
-              </th>
+/* -------------------------------------------------------------------------- */
+/* EMPTY STATE                                                                */
+/* -------------------------------------------------------------------------- */
 
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Movie
-              </th>
+function EmptyState() {
+  return (
+    <div className="px-6 py-16 text-center">
+      <MdPayment
+        size={34}
+        className="mx-auto text-gray-700"
+      />
 
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Showtime
-              </th>
+      <p className="mt-3 text-sm font-semibold text-gray-300">
+        No transactions found
+      </p>
 
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Seats
-              </th>
+      <p className="mt-1 text-xs text-gray-600">
+        Try changing your search or filters.
+      </p>
+    </div>
+  );
+}
 
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Amount
-              </th>
+/* -------------------------------------------------------------------------- */
+/* TRANSACTION MODAL                                                          */
+/* -------------------------------------------------------------------------- */
 
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Payment
-              </th>
+function TransactionModal({
+  transaction,
+  onClose,
+  onCopy,
+}) {
+  const StatusIcon =
+    getStatusIcon(
+      transaction.status
+    );
 
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Date
-              </th>
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (
+          event.target ===
+          event.currentTarget
+        ) {
+          onClose();
+        }
+      }}
+    >
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/[0.08] bg-[#07101C] shadow-2xl shadow-black/60">
+        {/* HEADER */}
 
-              <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-wider text-white/30">
-                Action
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="px-5 py-16 text-center"
-                >
-                  <div className="flex items-center justify-center gap-3 text-sm text-white/40">
-                    <FiRefreshCw
-                      size={17}
-                      className="animate-spin"
-                    />
-                    Loading payments...
-                  </div>
-                </td>
-              </tr>
-            ) : payments.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="px-5 py-16 text-center"
-                >
-                  <div className="mx-auto flex max-w-sm flex-col items-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-white/30">
-                      <FiCreditCard
-                        size={22}
-                      />
-                    </div>
-
-                    <p className="mt-4 text-sm font-medium text-white/60">
-                      No payments found
-                    </p>
-
-                    <p className="mt-1 text-xs text-white/30">
-                      Try changing your
-                      search or filters.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              payments.map((payment) => {
-                const customer =
-                  getCustomer(payment);
-
-                return (
-                  <tr
-                    key={
-                      payment._id ||
-                      payment.bookingId
-                    }
-                    className="border-b border-white/[0.05] transition hover:bg-white/[0.015]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="max-w-[210px]">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-medium text-white">
-                            {customer.name}
-                          </p>
-
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[9px] ${
-                              payment.recordType ===
-                              "manual"
-                                ? "bg-orange-500/10 text-orange-400"
-                                : "bg-blue-500/10 text-blue-400"
-                            }`}
-                          >
-                            {getRecordType(
-                              payment
-                            )}
-                          </span>
-                        </div>
-
-                        <p className="mt-1 truncate text-xs text-white/30">
-                          {customer.phone}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="max-w-[180px]">
-                        <p className="truncate text-sm text-white/75">
-                          {getMovieName(
-                            payment
-                          )}
-                        </p>
-
-                        <p className="mt-1 text-[11px] text-white/30">
-                          {getBookingType(
-                            payment
-                          )}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div>
-                        <p className="text-sm text-white/70">
-                          {formatShowDate(
-                            getDate(payment)
-                          )}
-                        </p>
-
-                        <p className="mt-1 text-xs text-white/30">
-                          {getTime(payment)}{" "}
-                          ·{" "}
-                          {getHall(payment)}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="max-w-[130px] truncate text-sm text-white/60">
-                        {getSeats(payment)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-semibold text-white">
-                        {formatMoney(
-                          payment.totalAmount
-                        )}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="space-y-1.5">
-                        <StatusBadge
-                          status={
-                            payment.paymentStatus
-                          }
-                        />
-
-                        <p className="text-[10px] capitalize text-white/30">
-                          {getPaymentMethod(
-                            payment
-                          )}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="whitespace-nowrap text-xs text-white/45">
-                        {formatDate(
-                          payment.createdAt
-                        )}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedPayment(
-                            payment
-                          )
-                        }
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] text-white/40 transition hover:bg-white/5 hover:text-white"
-                        title="View payment"
-                      >
-                        <FiEye size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {!loading &&
-        pagination.total > 0 && (
-          <div className="flex flex-col gap-3 border-t border-white/[0.07] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-white/30">
-              Showing{" "}
-              <span className="text-white/60">
-                {(pagination.page - 1) *
-                  pagination.limit +
-                  1}
-              </span>{" "}
-              to{" "}
-              <span className="text-white/60">
-                {Math.min(
-                  pagination.page *
-                    pagination.limit,
-                  pagination.total
-                )}
-              </span>{" "}
-              of{" "}
-              <span className="text-white/60">
-                {pagination.total}
-              </span>{" "}
-              payments
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-white/[0.06] bg-[#07101C]/95 p-5 backdrop-blur-xl">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-400">
+              Transaction Details
             </p>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={
-                  pagination.page <= 1
-                }
-                onClick={() =>
-                  setPage(
-                    pagination.page - 1
-                  )
-                }
-                className="rounded-lg border border-white/[0.08] px-3 py-2 text-xs text-white/50 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                Previous
-              </button>
+            <h2 className="mt-1 text-lg font-semibold text-white">
+              {transaction.id}
+            </h2>
+          </div>
 
-              <span className="px-2 text-xs text-white/40">
-                {pagination.page} /{" "}
-                {pagination.totalPages}
-              </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition hover:bg-white/[0.05] hover:text-white"
+            aria-label="Close"
+          >
+            <MdClose size={20} />
+          </button>
+        </div>
 
-              <button
-                type="button"
-                disabled={
-                  pagination.page >=
-                  pagination.totalPages
-                }
-                onClick={() =>
-                  setPage(
-                    pagination.page + 1
-                  )
-                }
-                className="rounded-lg border border-white/[0.08] px-3 py-2 text-xs text-white/50 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                Next
-              </button>
+        <div className="p-5">
+          {/* STATUS */}
+
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.13em] text-gray-600">
+                  Payment Status
+                </p>
+
+                <div className="mt-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${getStatusClasses(
+                      transaction.status
+                    )}`}
+                  >
+                    <StatusIcon size={13} />
+
+                    {transaction.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="sm:text-right">
+                <p className="text-[10px] uppercase tracking-[0.13em] text-gray-600">
+                  Amount
+                </p>
+
+                <p className="mt-1 text-2xl font-semibold text-white">
+                  {formatCurrency(
+                    transaction.amount
+                  )}
+                </p>
+              </div>
             </div>
           </div>
-        )}
+
+          {/* CUSTOMER */}
+
+          <DetailSection title="Customer">
+            <DetailRow
+              label="Name"
+              value={
+                transaction.customer
+              }
+            />
+
+            <DetailRow
+              label="Email"
+              value={
+                transaction.email
+              }
+            />
+
+            <DetailRow
+              label="Phone"
+              value={
+                transaction.phone
+              }
+            />
+          </DetailSection>
+
+          {/* BOOKING */}
+
+          <DetailSection title="Booking">
+            <DetailRow
+              label="Booking Reference"
+              value={
+                transaction.bookingId
+              }
+            />
+
+            <DetailRow
+              label="Booking Group"
+              value={
+                transaction.bookingGroupReference
+              }
+            />
+
+            <DetailRow
+              label="Type"
+              value={
+                transaction.type
+              }
+            />
+
+            <DetailRow
+              label="Service"
+              value={
+                transaction.service
+              }
+            />
+
+            <DetailRow
+              label="Facility"
+              value={
+                transaction.facility
+              }
+            />
+
+            <DetailRow
+              label="Date"
+              value={formatDate(
+                transaction.date
+              )}
+            />
+
+            <DetailRow
+              label="Time"
+              value={
+                transaction.time
+              }
+            />
+
+            {transaction.movieName && (
+              <DetailRow
+                label="Movie"
+                value={
+                  transaction.movieName
+                }
+              />
+            )}
+
+            <DetailRow
+              label="Quantity"
+              value={
+                transaction.quantity
+              }
+            />
+
+            <DetailRow
+              label="Booking Status"
+              value={
+                transaction.bookingStatus
+              }
+            />
+          </DetailSection>
+
+          {/* PAYMENT */}
+
+          <DetailSection title="Payment">
+            <DetailRow
+              label="Payment Method"
+              value={
+                transaction.paymentMethod ||
+                transaction.method
+              }
+            />
+
+            <DetailRow
+              label="Gateway"
+              value={
+                transaction.gateway
+              }
+            />
+
+            <CopyableRow
+              label="Gateway Transaction ID"
+              value={
+                transaction.transactionId
+              }
+              onCopy={onCopy}
+            />
+
+            <CopyableRow
+              label="Booking Reference"
+              value={
+                transaction.bookingId
+              }
+              onCopy={onCopy}
+            />
+
+            <DetailRow
+              label="Payment Initiated"
+              value={formatDateTime(
+                transaction.paymentInitiatedAt
+              )}
+            />
+
+            <DetailRow
+              label="Payment Paid"
+              value={formatDateTime(
+                transaction.paymentPaidAt
+              )}
+            />
+
+            <DetailRow
+              label="Bank Transaction ID"
+              value={
+                transaction.paymentBankTransactionId
+              }
+            />
+
+            <DetailRow
+              label="Card Type"
+              value={
+                transaction.paymentCardType
+              }
+            />
+
+            <DetailRow
+              label="Validation ID"
+              value={
+                transaction.paymentValidationId
+              }
+            />
+          </DetailSection>
+        </div>
+
+        {/* FOOTER */}
+
+        <div className="border-t border-white/[0.06] p-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 w-full rounded-xl bg-blue-500 text-sm font-semibold text-white transition hover:bg-blue-400"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
-  </div>
+  );
+}
 
-  {selectedPayment && (
-    <PaymentDetails
-      payment={selectedPayment}
-      onClose={() =>
-        setSelectedPayment(null)
-      }
-    />
-  )}
-</div>
+/* -------------------------------------------------------------------------- */
+/* DETAIL SECTION                                                             */
+/* -------------------------------------------------------------------------- */
 
+function DetailSection({
+  title,
+  children,
+}) {
+  return (
+    <div className="mt-6">
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
+        {title}
+      </p>
 
-);
+      <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.018]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* DETAIL ROW                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function DetailRow({
+  label,
+  value,
+}) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-white/[0.05] px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+      <span className="text-[11px] text-gray-600">
+        {label}
+      </span>
+
+      <span className="break-all text-xs font-medium text-gray-300 sm:text-right">
+        {value || "—"}
+      </span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* COPYABLE ROW                                                               */
+/* -------------------------------------------------------------------------- */
+
+function CopyableRow({
+  label,
+  value,
+  onCopy,
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-b border-white/[0.05] px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+      <span className="text-[11px] text-gray-600">
+        {label}
+      </span>
+
+      <button
+        type="button"
+        disabled={!value}
+        onClick={() => onCopy(value)}
+        className="group inline-flex max-w-full items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-40 sm:justify-end"
+      >
+        <span className="break-all text-xs font-medium text-gray-300 transition group-hover:text-white">
+          {value || "—"}
+        </span>
+
+        {value && (
+          <MdContentCopy
+            size={14}
+            className="shrink-0 text-gray-600 transition group-hover:text-blue-400"
+          />
+        )}
+      </button>
+    </div>
+  );
 }
