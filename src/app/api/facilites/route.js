@@ -295,6 +295,7 @@ async function ensureFixedFacilities() {
 export async function GET() {
   try {
 
+
     await connectDB();
     await ensureFixedFacilities();
 
