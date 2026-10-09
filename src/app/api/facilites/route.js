@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { connectDB } from "@/lib/mongodb";
-import { requireAdmin } from "@/lib/requireAdmin";
 import Facility from "@/models/facility";
 
 export const dynamic = "force-dynamic";

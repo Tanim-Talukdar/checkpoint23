@@ -16,6 +16,11 @@ import {
 
 const links = [
   {
+    name: "Booking",
+    href: "/booking",
+    icon: FiCalendar,
+  },
+  {
     name: "Gaming",
     href: "/#gaming",
     icon: FiMonitor,
@@ -36,13 +41,9 @@ const links = [
     icon:  FiGrid,
   },
 
+
   {
-    name: "Booking",
-    href: "/booking",
-    icon: FiCalendar,
-  },
-  {
-    name: "Contact",
+    name: "Contact & Location",
     href: "/#contact",
     icon:  FiMapPin,
   },
