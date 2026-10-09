@@ -1,6 +1,7 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -8,7 +9,7 @@ import {
   FiArrowLeft,
 } from "react-icons/fi";
 
-export default function BookingFailedPage() {
+function BookingFailedContent() {
   const searchParams = useSearchParams();
 
   const bookingGroupReference =
@@ -58,5 +59,23 @@ export default function BookingFailedPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function BookingFailedPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#030712] px-4 py-16 text-white">
+          <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center">
+            <p className="text-sm text-gray-400">
+              Loading payment details...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <BookingFailedContent />
+    </Suspense>
   );
 }
