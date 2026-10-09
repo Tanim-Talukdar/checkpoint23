@@ -28,17 +28,18 @@ const navigation = [
     href: "/admin/facalites",
     icon: FiLayers,
   },
-    {
-    name: "Bookings",
-    href: "/admin/bookings",
-    icon: FiUsers,
-  },
+
   {
     name: "Booking Slot",
     href: "/admin/booking-slots",
     icon: FiClock,
   },
-
+  {
+    name: "Bookings",
+    href: "/admin/bookings",
+    icon: FiUsers,
+  },
+  
   {
     name: "Membership",
     href: "/admin/membership",
