@@ -294,17 +294,6 @@ async function ensureFixedFacilities() {
 
 export async function GET() {
   try {
-    const { authenticated } = await requireAdmin();
-
-    if (!authenticated) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Unauthorized",
-        },
-        { status: 401 }
-      );
-    }
 
     await connectDB();
     await ensureFixedFacilities();
