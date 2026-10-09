@@ -1,7 +1,12 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,7 +21,7 @@ import {
 const POLL_INTERVAL = 3000;
 const MAX_POLL_ATTEMPTS = 20;
 
-export default function BookingSuccessPage() {
+function BookingSuccessContent() {
   const searchParams = useSearchParams();
 
   const bookingGroupReference =
@@ -30,7 +35,9 @@ export default function BookingSuccessPage() {
   const checkStatus = useCallback(
     async (isPolling = false) => {
       if (!bookingGroupReference) {
+        setData(null);
         setLoading(false);
+        setChecking(false);
         setError("Booking reference is missing.");
         return null;
       }
@@ -56,7 +63,8 @@ export default function BookingSuccessPage() {
 
         if (!response.ok || !result.success) {
           throw new Error(
-            result.message || "Unable to check booking status."
+            result.message ||
+              "Unable to check booking status."
           );
         }
 
@@ -105,10 +113,7 @@ export default function BookingSuccessPage() {
         return;
       }
 
-      timeoutId = setTimeout(
-        poll,
-        POLL_INTERVAL
-      );
+      timeoutId = setTimeout(poll, POLL_INTERVAL);
     };
 
     poll();
@@ -116,7 +121,7 @@ export default function BookingSuccessPage() {
     return () => {
       cancelled = true;
 
-      if (timeoutId) {
+      if (timeoutId !== null) {
         clearTimeout(timeoutId);
       }
     };
@@ -292,17 +297,15 @@ export default function BookingSuccessPage() {
                       <p className="text-gray-600">
                         Date
                       </p>
+
                       <p className="mt-1 text-gray-300">
                         {new Date(
                           booking.bookingDate
-                        ).toLocaleDateString(
-                          "en-BD",
-                          {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          }
-                        )}
+                        ).toLocaleDateString("en-BD", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
                       </p>
                     </div>
 
@@ -310,6 +313,7 @@ export default function BookingSuccessPage() {
                       <p className="text-gray-600">
                         Time
                       </p>
+
                       <p className="mt-1 text-gray-300">
                         {booking.startTime} -{" "}
                         {booking.endTime}
@@ -320,6 +324,7 @@ export default function BookingSuccessPage() {
                       <p className="text-gray-600">
                         Quantity
                       </p>
+
                       <p className="mt-1 text-gray-300">
                         {booking.quantity}
                       </p>
@@ -329,10 +334,10 @@ export default function BookingSuccessPage() {
                       <p className="text-gray-600">
                         Status
                       </p>
+
                       <p
                         className={`mt-1 font-medium ${
-                          booking.status ===
-                            "confirmed"
+                          booking.status === "confirmed"
                             ? "text-emerald-400"
                             : "text-amber-400"
                         }`}
@@ -374,3 +379,24 @@ export default function BookingSuccessPage() {
   );
 }
 
+export default function BookingSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#030712] px-4 py-16 text-white">
+          <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center">
+            <div className="text-center">
+              <FiLoader className="mx-auto mb-5 h-10 w-10 animate-spin text-blue-500" />
+
+              <p className="text-sm text-gray-400">
+                Loading booking details...
+              </p>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <BookingSuccessContent />
+    </Suspense>
+  );
+}

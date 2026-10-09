@@ -1,6 +1,7 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -8,7 +9,7 @@ import {
   FiArrowLeft,
 } from "react-icons/fi";
 
-export default function BookingCancelledPage() {
+function BookingFailedContent() {
   const searchParams = useSearchParams();
 
   const bookingGroupReference =
@@ -21,16 +22,18 @@ export default function BookingCancelledPage() {
           <FiXCircle className="mx-auto h-16 w-16 text-amber-400" />
 
           <p className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
-            Payment cancelled
+            Payment failed
           </p>
 
           <h1 className="mt-3 text-3xl font-bold">
-            Payment was cancelled
+            Payment was unsuccessful
           </h1>
 
           <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-gray-400">
-            The payment process was cancelled before
-            completion. Your booking has not been confirmed.
+            We couldn&apos;t complete your payment. Your
+            booking has not been confirmed. If money was
+            deducted from your account, please contact us
+            before attempting another payment.
           </p>
 
           {bookingGroupReference && (
@@ -57,5 +60,23 @@ export default function BookingCancelledPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function BookingFailedPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#030712] px-4 py-16 text-white">
+          <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center">
+            <p className="text-sm text-gray-400">
+              Loading payment details...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <BookingFailedContent />
+    </Suspense>
   );
 }
