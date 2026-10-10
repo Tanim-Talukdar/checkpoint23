@@ -20,7 +20,7 @@ export async function requireAdmin() {
       role: "admin",
       isActive: true,
     }).select("_id name email role adminLevel isActive");
-
+    console.log("Admin:", admin?.email, "Level:", admin?.adminLevel);
     return admin
       ? { authenticated: true, admin }
       : { authenticated: false, admin: null };
