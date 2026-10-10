@@ -1,9 +1,16 @@
+
 import { NextResponse } from "next/server";
 
 import { connectDB } from "@/lib/mongodb";
 import Facility from "@/models/facility";
 
 export const dynamic = "force-dynamic";
+
+const PLAYGROUND_DISCOUNT = {
+  percentage: 30,
+  startTime: "11:00",
+  endTime: "16:00",
+};
 
 const FIXED_FACILITIES = [
   {
@@ -42,7 +49,6 @@ const FIXED_FACILITIES = [
       },
     ],
   },
-
   {
     name: "Swimming Pool",
     slug: "swimming-pool",
@@ -79,7 +85,6 @@ const FIXED_FACILITIES = [
       },
     ],
   },
-
   {
     name: "Gym + Pool",
     slug: "gym-pool",
@@ -116,7 +121,6 @@ const FIXED_FACILITIES = [
       },
     ],
   },
-
   {
     name: "Steam Bath",
     slug: "steam-bath",
@@ -140,7 +144,6 @@ const FIXED_FACILITIES = [
       },
     ],
   },
-
   {
     name: "Playground",
     slug: "playground",
@@ -203,7 +206,6 @@ const FIXED_FACILITIES = [
       },
     ],
   },
-
   {
     name: "Private Movie",
     slug: "private-movie",
@@ -274,6 +276,24 @@ function getSchedules(facility) {
   return createSchedule(60);
 }
 
+function addDiscountMetadata(facility) {
+  const result = { ...facility };
+
+  if (result.slug !== "playground" || !Array.isArray(result.services)) {
+    return result;
+  }
+
+  result.services = result.services.map((service) => ({
+    ...service,
+    offPeakDiscount: {
+      ...PLAYGROUND_DISCOUNT,
+      applies: true,
+    },
+  }));
+
+  return result;
+}
+
 async function ensureFixedFacilities() {
   for (const facilityData of FIXED_FACILITIES) {
     const existing = await Facility.findOne({
@@ -293,8 +313,6 @@ async function ensureFixedFacilities() {
 
 export async function GET() {
   try {
-
-
     await connectDB();
     await ensureFixedFacilities();
 
@@ -304,13 +322,10 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      facilities,
+      facilities: facilities.map(addDiscountMetadata),
     });
   } catch (error) {
-    console.error(
-      "GET /api/admin/facilities error:",
-      error
-    );
+    console.error("GET /api/admin/facilities error:", error);
 
     return NextResponse.json(
       {

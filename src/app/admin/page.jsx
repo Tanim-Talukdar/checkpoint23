@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  FiActivity,
   FiArrowUpRight,
   FiCalendar,
   FiCheckCircle,
@@ -12,40 +11,17 @@ import {
   FiDollarSign,
   FiRefreshCw,
   FiUsers,
-  FiVideo,
-  FiWind,
 } from "react-icons/fi";
 
 const TIME_ZONE = "Asia/Dhaka";
 
-const FACILITY_ICONS = {
-  gym: FiActivity,
-  "swimming-pool": FiUsers,
-  "gym-pool": FiActivity,
-  "steam-bath": FiWind,
-  playground: FiActivity,
-  "private-movie": FiVideo,
-};
-
-const FACILITY_TYPES = {
-  fitness: "Fitness",
-  steam: "Wellness",
-  playground: "Sports",
-  movie: "Entertainment",
-};
-
-const EMPTY_DATA = {
-  stats: {
-    todayBookings: 0,
-    todayRevenue: 0,
-    todayPayments: 0,
-    confirmedBookings: 0,
-    upcomingBookings: 0,
-    activeMemberships: 0,
-    averageOccupancy: 0,
-  },
-  facilities: [],
-  todaySchedule: [],
+const EMPTY_STATS = {
+  todayBookings: 0,
+  todayRevenue: 0,
+  todayPayments: 0,
+  confirmedBookings: 0,
+  upcomingBookings: 0,
+  activeMemberships: 0,
 };
 
 function formatDate(date = new Date()) {
@@ -90,12 +66,6 @@ function formatMoney(value) {
 
 function getStatusClasses(status) {
   switch (status) {
-    case "Full":
-      return "border-red-400/20 bg-red-400/10 text-red-300";
-
-    case "Limited":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
-
     case "Booked":
       return "border-blue-400/20 bg-blue-400/10 text-blue-300";
 
@@ -116,69 +86,6 @@ function getStatusClasses(status) {
     default:
       return "border-white/10 bg-white/[0.03] text-white/50";
   }
-}
-
-function getFacilityTypeLabel(facility) {
-  return (
-    FACILITY_TYPES[facility?.facilityType] ||
-    facility?.type ||
-    "Facility"
-  );
-}
-
-function getCurrentSlot(facility) {
-  return facility?.currentSlot || facility?.slot || null;
-}
-
-function getOccupancy(facility) {
-  const slot = getCurrentSlot(facility);
-
-  if (!slot) {
-    return {
-      active: false,
-      booked: 0,
-      capacity: 0,
-      percentage: 0,
-      status: "Not in session",
-      time: "",
-    };
-  }
-
-  const startTime = slot.startTime || slot.start;
-  const endTime = slot.endTime || slot.end;
-  const booked = Math.max(
-    0,
-    Number(slot.booked ?? slot.bookedQuantity) || 0
-  );
-  const capacity = Math.max(0, Number(slot.capacity) || 0);
-
-  const rawPercentage =
-    slot.percentage ??
-    slot.occupancy ??
-    (capacity ? (booked / capacity) * 100 : 0);
-
-  const percentage = Math.min(
-    100,
-    Math.max(0, Math.round(Number(rawPercentage) || 0))
-  );
-
-  let status = slot.status;
-
-  if (!status) {
-    if (!capacity) status = "Not in session";
-    else if (booked >= capacity) status = "Full";
-    else if (booked / capacity >= 0.75) status = "Limited";
-    else status = "Available";
-  }
-
-  return {
-    active: Boolean(startTime && endTime && capacity > 0),
-    booked,
-    capacity,
-    percentage,
-    status,
-    time: `${formatTime(startTime)} – ${formatTime(endTime)}`,
-  };
 }
 
 function StatCard({ item }) {
@@ -229,9 +136,9 @@ function SectionHeader({ title, description, action }) {
 }
 
 export default function AdminDashboard() {
-  const [dashboard, setDashboard] = useState(EMPTY_DATA);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [todaySchedule, setTodaySchedule] = useState([]);
   const [now, setNow] = useState(() => new Date());
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -280,20 +187,15 @@ export default function AdminDashboard() {
 
       const data = result.data || {};
 
-      setDashboard({
-        stats: {
-          ...EMPTY_DATA.stats,
-          ...(data.stats || {}),
-        },
-        facilities: Array.isArray(data.facilities)
-          ? data.facilities
-          : [],
-        todaySchedule: Array.isArray(data.todaySchedule)
-          ? data.todaySchedule
-          : [],
+      setStats({
+        ...EMPTY_STATS,
+        ...(data.stats || {}),
       });
 
-      setLastUpdated(new Date());
+      setTodaySchedule(
+        Array.isArray(data.todaySchedule) ? data.todaySchedule : []
+      );
+
       setNow(new Date());
     } catch (loadError) {
       console.error("Admin dashboard loading error:", loadError);
@@ -310,7 +212,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadDashboard();
 
-    // Update the displayed clock without repeatedly fetching dashboard data.
     const timer = setInterval(() => {
       setNow(new Date());
     }, 30_000);
@@ -320,10 +221,7 @@ export default function AdminDashboard() {
 
   const formattedDate = useMemo(() => formatDate(now), [now]);
 
-  const { stats, facilities, todaySchedule } = dashboard;
-
   const dashboardStats = useMemo(() => {
-    const occupancy = Number(stats.averageOccupancy) || 0;
     const confirmed = Number(stats.confirmedBookings) || 0;
     const paid = Number(stats.todayPayments) || 0;
 
@@ -355,18 +253,6 @@ export default function AdminDashboard() {
         change: "Confirmed",
         description: "paid memberships",
         icon: FiUsers,
-      },
-      {
-        label: "Current Occupancy",
-        value: `${occupancy}%`,
-        change:
-          occupancy >= 75
-            ? "High"
-            : occupancy >= 50
-              ? "Healthy"
-              : "Available",
-        description: "currently running slots",
-        icon: FiActivity,
       },
     ];
   }, [stats]);
@@ -426,114 +312,10 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {dashboardStats.map((item) => (
             <StatCard key={item.label} item={item} />
           ))}
-        </section>
-
-        <section className="mt-8">
-          <SectionHeader
-            title="Facility Overview"
-            description="Occupancy for the time slot currently in progress"
-            action={
-              <span className="text-xs text-white/30">
-                {loading
-                  ? "Loading..."
-                  : lastUpdated
-                    ? `Updated ${new Intl.DateTimeFormat("en-US", {
-                        timeZone: TIME_ZONE,
-                        hour: "numeric",
-                        minute: "2-digit",
-                      }).format(lastUpdated)}`
-                    : "Not updated"}
-              </span>
-            }
-          />
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {!facilities.length ? (
-              <div className="rounded-2xl border border-white/10 bg-[#07101D] p-5 text-sm text-white/40 sm:col-span-2 xl:col-span-3">
-                {loading
-                  ? "Loading facility availability..."
-                  : "No facilities available."}
-              </div>
-            ) : (
-              facilities.map((facility, index) => {
-                const Icon = FACILITY_ICONS[facility.slug] || FiActivity;
-                const current = getOccupancy(facility);
-
-                return (
-                  <div
-                    key={
-                      facility.id ||
-                      facility._id ||
-                      facility.slug ||
-                      index
-                    }
-                    className="rounded-2xl border border-white/10 bg-[#07101D] p-5"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-blue-400">
-                          <Icon size={18} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-white">
-                            {facility.name || "Facility"}
-                          </h3>
-
-                          <p className="mt-0.5 text-xs text-white/35">
-                            {getFacilityTypeLabel(facility)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${getStatusClasses(current.status)}`}
-                      >
-                        {current.status}
-                      </span>
-                    </div>
-
-                    <div className="mt-6">
-                      <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="text-white/40">Current slot</span>
-
-                        <span className="text-right font-medium text-white/70">
-                          {current.active ? current.time : "No active slot"}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between text-xs">
-                        <span className="text-white/40">Occupancy</span>
-
-                        <span className="font-medium text-white/70">
-                          {current.active
-                            ? `${current.booked} / ${current.capacity}`
-                            : "—"}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5">
-                        <div
-                          className="h-full rounded-full bg-blue-500 transition-all"
-                          style={{ width: `${current.percentage}%` }}
-                        />
-                      </div>
-
-                      <p className="mt-2 text-[11px] text-white/30">
-                        {current.active
-                          ? `${current.percentage}% occupied`
-                          : "No occupancy calculated outside an active slot"}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
         </section>
 
         <section className="mt-8">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -27,11 +28,7 @@ const FITNESS_GROUPS = [
   },
   {
     title: "Gym + Swimming Pool",
-    names: [
-      "gym + pool",
-      "gym + swimming pool",
-      "gym and pool",
-    ],
+    names: ["gym + pool", "gym + swimming pool", "gym and pool"],
   },
 ];
 
@@ -131,9 +128,8 @@ function getFitnessGroupName(facilityName) {
   const name = normalizeName(facilityName);
 
   return (
-    FITNESS_GROUPS.find((group) =>
-      group.names.includes(name)
-    )?.title || null
+    FITNESS_GROUPS.find((group) => group.names.includes(name))?.title ||
+    null
   );
 }
 
@@ -269,6 +265,59 @@ function timeToMinutes(value) {
   return hours * 60 + minutes;
 }
 
+/*
+ * FRONTEND DISPLAY CALCULATION
+ *
+ * The discount settings come from the /api/facilites response.
+ * This function calculates a display/cart price only.
+ * The booking backend must independently calculate the actual price.
+ *
+ * Discount applies to Playground slot start times:
+ * 11:00 AM <= start time < 4:00 PM.
+ */
+function getServicePriceDetails(service, startTime) {
+  const originalPrice = Number(service?.price || 0);
+  const discount = service?.offPeakDiscount;
+
+  const startMinutes = timeToMinutes(startTime);
+  const discountStart = timeToMinutes(discount?.startTime);
+  const discountEnd = timeToMinutes(discount?.endTime);
+
+  const isPlayground =
+    normalizeName(service?.facilityName) === "playground";
+
+  const percentage = Number(discount?.percentage);
+
+  const validPercentage =
+    Number.isFinite(percentage) &&
+    percentage > 0 &&
+    percentage <= 100;
+
+  const eligible =
+    isPlayground &&
+    discount?.applies === true &&
+    validPercentage &&
+    Number.isFinite(originalPrice) &&
+    originalPrice >= 0 &&
+    startMinutes !== null &&
+    discountStart !== null &&
+    discountEnd !== null &&
+    startMinutes >= discountStart &&
+    startMinutes < discountEnd;
+
+  const discountAmount = eligible
+    ? Math.round((originalPrice * percentage) / 100)
+    : 0;
+
+  return {
+    originalPrice,
+    discountPercentage: eligible ? percentage : 0,
+    discountAmount,
+    finalPrice: originalPrice - discountAmount,
+    discounted: discountAmount > 0,
+  };
+}
+
 function formatDisplayTime(value) {
   if (!value) return "";
 
@@ -279,9 +328,10 @@ function formatDisplayTime(value) {
   const hours24 = Math.floor(minutes / 60);
   const suffix = hours24 >= 12 ? "PM" : "AM";
 
-  return `${hours24 % 12 || 12}:${String(
-    minutes % 60
-  ).padStart(2, "0")} ${suffix}`;
+  return `${hours24 % 12 || 12}:${String(minutes % 60).padStart(
+    2,
+    "0"
+  )} ${suffix}`;
 }
 
 function formatSlotDisplay(slot) {
@@ -301,11 +351,9 @@ function getMaximumQuantity(service) {
 
   const capacity = Number(service?.capacity);
 
-  return (
-    Number.isInteger(capacity) &&
+  return Number.isInteger(capacity) &&
     capacity > 0 &&
     service?.pricingType !== "per_booking"
-  )
     ? capacity
     : null;
 }
@@ -348,6 +396,9 @@ export default function BookingPage() {
   const dateRef = useRef(null);
   const timeRef = useRef(null);
   const quantityRef = useRef(null);
+
+  // NEW: Used to scroll to Membership Rules when a membership is selected.
+  const membershipRulesRef = useRef(null);
 
   /* LOAD FACILITIES */
 
@@ -419,9 +470,7 @@ export default function BookingPage() {
     [clockTick]
   );
 
-  /* CURRENT SERVICES
-     Gym and Swimming Pool each include their own services
-     and the existing combo-facility services. */
+  /* CURRENT SERVICES */
 
   const currentServices = useMemo(() => {
     const uiFacility = FACILITY_UI.find(
@@ -439,10 +488,7 @@ export default function BookingPage() {
         return true;
       }
 
-      return (
-        includeCombo &&
-        isFacilityMatch(facility, COMBO_NAMES)
-      );
+      return includeCombo && isFacilityMatch(facility, COMBO_NAMES);
     });
 
     const services = facilities.flatMap((facility) =>
@@ -486,8 +532,7 @@ export default function BookingPage() {
         services: currentServices
           .filter(
             (service) =>
-              getFitnessGroupName(service.facilityName) ===
-              group.title
+              getFitnessGroupName(service.facilityName) === group.title
           )
           .sort(
             (a, b) => Number(a.membership) - Number(b.membership)
@@ -522,6 +567,13 @@ export default function BookingPage() {
         (service) => service.id === selectedServiceId
       ) || null,
     [currentServices, selectedServiceId]
+  );
+
+  /* PRICE DETAILS FOR THE SELECTED SERVICE AND SLOT */
+
+  const selectedPriceDetails = useMemo(
+    () => getServicePriceDetails(selectedService, selectedSlot),
+    [selectedService, selectedSlot]
   );
 
   /* SELECT DEFAULT SERVICE */
@@ -646,8 +698,9 @@ export default function BookingPage() {
   const minimumQuantity = getMinimumQuantity(selectedService);
   const maximumQuantity = getMaximumQuantity(selectedService);
 
+  // Uses the discounted unit price only when the selected slot qualifies.
   const itemTotal = selectedService
-    ? Number(selectedService.price || 0) * quantity
+    ? selectedPriceDetails.finalPrice * quantity
     : 0;
 
   const cartTotal = useMemo(
@@ -726,8 +779,10 @@ export default function BookingPage() {
     scrollToSection(serviceRef);
   }
 
+  // UPDATED: Membership selection scrolls to Membership Rules.
   function handleServiceChange(id) {
     const service = currentServices.find((item) => item.id === id);
+    const membership = isMembershipService(service);
 
     setSelectedServiceId(id);
     setSelectedDate("");
@@ -738,7 +793,9 @@ export default function BookingPage() {
     setAvailabilityError("");
     setSubmitError("");
 
-    scrollToSection(dateRef);
+    scrollToSection(
+      membership ? membershipRulesRef : dateRef
+    );
   }
 
   function handleDateChange(value) {
@@ -877,7 +934,13 @@ export default function BookingPage() {
       return;
     }
 
-    const price = Number(selectedService.price || 0);
+    // Calculate the frontend display/cart price using the selected start time.
+    const priceDetails = getServicePriceDetails(
+      selectedService,
+      startTime
+    );
+
+    const price = priceDetails.finalPrice;
 
     const newItem = {
       id: `${selectedService.facilityId}-${selectedService.id}-${selectedDate}-${startTime}-${Date.now()}`,
@@ -885,7 +948,15 @@ export default function BookingPage() {
       facilityName: selectedService.facilityName,
       serviceId: selectedService.id,
       title: selectedService.name,
+
+      // Unit price used for the frontend cart display.
       price,
+
+      // Preserve the original price and discount details for the cart.
+      originalPrice: priceDetails.originalPrice,
+      discountAmount: priceDetails.discountAmount,
+      discountPercentage: priceDetails.discountPercentage,
+
       quantity,
       date: selectedDate,
       startTime,
@@ -929,7 +1000,8 @@ export default function BookingPage() {
     setSubmitting(true);
 
     try {
-      // Never trust client-side prices or totals for payment.
+      // Never send client prices/totals as authoritative payment amounts.
+      // The backend must calculate prices and discounts independently.
       const items = cart.map((item) => ({
         facilityId: item.facilityId,
         serviceId: item.serviceId,
@@ -1179,7 +1251,7 @@ export default function BookingPage() {
                           alt={item.title}
                           loading="lazy"
                           decoding="async"
-                          className="absolute inset-0 h-full w-full object-cover opacity-45 transition duration-500 group-hover:scale-105 group-hover:opacity-55"
+                          className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-500 group-hover:scale-105 group-hover:opacity-55"
                         />
 
                         <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-[#030712]/70 to-transparent" />
@@ -1233,7 +1305,7 @@ export default function BookingPage() {
                   <div className="space-y-6 sm:space-y-7">
                     {fitnessServiceGroups.map((group) => (
                       <section key={group.title}>
-                        <h3 className="mb-3 text-base font-bold tracking-tight sm:text-lg">
+                        <h3 className="mb-3 text-blue-500 text-base font-bold tracking-tight sm:text-lg">
                           {group.title}
                         </h3>
 
@@ -1243,6 +1315,11 @@ export default function BookingPage() {
                               key={service.id}
                               service={service}
                               active={selectedServiceId === service.id}
+                              startTime={
+                                selectedServiceId === service.id
+                                  ? selectedSlot
+                                  : ""
+                              }
                               onClick={() =>
                                 handleServiceChange(service.id)
                               }
@@ -1259,6 +1336,11 @@ export default function BookingPage() {
                             key={service.id}
                             service={service}
                             active={selectedServiceId === service.id}
+                            startTime={
+                              selectedServiceId === service.id
+                                ? selectedSlot
+                                : ""
+                            }
                             onClick={() =>
                               handleServiceChange(service.id)
                             }
@@ -1274,6 +1356,11 @@ export default function BookingPage() {
                         key={service.id}
                         service={service}
                         active={selectedServiceId === service.id}
+                        startTime={
+                          selectedServiceId === service.id
+                            ? selectedSlot
+                            : ""
+                        }
                         onClick={() =>
                           handleServiceChange(service.id)
                         }
@@ -1286,7 +1373,10 @@ export default function BookingPage() {
               {/* MEMBERSHIP RULES */}
 
               {isMembership && (
-                <div className="mt-6 rounded-3xl border border-blue-500/20 bg-blue-500/[0.05] p-5 sm:p-7">
+                <div
+                  ref={membershipRulesRef}
+                  className="mt-6 scroll-mt-28 rounded-3xl border border-blue-500/20 bg-blue-500/[0.05] p-5 sm:scroll-mt-32 sm:p-7"
+                >
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
                     03
                   </p>
@@ -1554,6 +1644,11 @@ export default function BookingPage() {
 
                         const active = selectedSlot === slot.startTime;
 
+                        const slotPriceDetails = getServicePriceDetails(
+                          selectedService,
+                          slot.startTime
+                        );
+
                         return (
                           <button
                             key={`${slot.startTime}-${slot.endTime}`}
@@ -1589,6 +1684,20 @@ export default function BookingPage() {
                                 </span>
                               )}
                             </div>
+
+                            {slotPriceDetails.discounted && (
+                              <div className="mt-3">
+                                <span className="text-sm font-semibold text-emerald-300">
+                                  {formatPrice(slotPriceDetails.finalPrice)}
+                                </span>
+                                <span className="ml-2 text-[10px] text-white/30 line-through">
+                                  {formatPrice(slotPriceDetails.originalPrice)}
+                                </span>
+                                <p className="mt-1 text-[10px] text-emerald-300/80">
+                                  {slotPriceDetails.discountPercentage}% off
+                                </p>
+                              </div>
+                            )}
 
                             <div className="mt-3">
                               {full ? (
@@ -1733,9 +1842,33 @@ export default function BookingPage() {
                 <div className="mt-6 flex items-center justify-between rounded-2xl border border-white/10 bg-[#030712] px-4 py-4">
                   <div>
                     <p className="text-xs text-white/35">Current total</p>
-                    <p className="mt-1 text-xl font-semibold">
+
+                    {selectedPriceDetails.discounted && (
+                      <p className="mt-1 text-xs text-white/30 line-through">
+                        {formatPrice(
+                          selectedPriceDetails.originalPrice * quantity
+                        )}
+                      </p>
+                    )}
+
+                    <p
+                      className={`mt-1 text-xl font-semibold ${
+                        selectedPriceDetails.discounted
+                          ? "text-emerald-300"
+                          : ""
+                      }`}
+                    >
                       {formatPrice(itemTotal)}
                     </p>
+
+                    {selectedPriceDetails.discounted && (
+                      <p className="mt-1 text-xs text-emerald-300/80">
+                        You save{" "}
+                        {formatPrice(
+                          selectedPriceDetails.discountAmount * quantity
+                        )}
+                      </p>
+                    )}
                   </div>
 
                   <button
@@ -1890,7 +2023,12 @@ function CustomerInput({
 
 /* SERVICE CARD */
 
-function ServiceCard({ service, active, onClick }) {
+function ServiceCard({
+  service,
+  active,
+  onClick,
+  startTime = "",
+}) {
   const unit =
     service.displayUnit === "person"
       ? "per person"
@@ -1901,6 +2039,8 @@ function ServiceCard({ service, active, onClick }) {
           : "per booking";
 
   const duration = serviceDuration(service);
+
+  const pricing = getServicePriceDetails(service, startTime);
 
   return (
     <button
@@ -1944,14 +2084,37 @@ function ServiceCard({ service, active, onClick }) {
               Private
             </span>
           )}
+
+          {pricing.discounted && (
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-wider text-emerald-300 sm:text-[9px]">
+              {pricing.discountPercentage}% OFF
+            </span>
+          )}
         </div>
       </div>
 
       <div className="mt-4 flex min-w-0 items-end justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-base font-semibold sm:text-xl">
-            {formatPrice(service.price)}
-          </p>
+          {pricing.discounted ? (
+            <>
+              <p className="text-base font-semibold text-emerald-300 sm:text-xl">
+                {formatPrice(pricing.finalPrice)}
+              </p>
+
+              <p className="mt-1 text-xs text-white/35 line-through">
+                {formatPrice(pricing.originalPrice)}
+              </p>
+
+              <p className="mt-1 text-[9px] text-emerald-300/80 sm:text-xs">
+                Save {formatPrice(pricing.discountAmount)}
+              </p>
+            </>
+          ) : (
+            <p className="text-base font-semibold sm:text-xl">
+              {formatPrice(pricing.originalPrice)}
+            </p>
+          )}
+
           <p className="mt-1 break-words text-[9px] text-white/40 sm:text-xs">
             {unit}
           </p>
@@ -2026,6 +2189,22 @@ function CartContent({
                     <p className="mt-1 text-xs text-white/35">
                       {item.quantity} × {formatPrice(item.price)}
                     </p>
+
+                    {item.discountAmount > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-white/30 line-through">
+                          Regular price:{" "}
+                          {formatPrice(item.originalPrice * item.quantity)}
+                        </p>
+
+                        <p className="text-xs text-emerald-300">
+                          Off-peak discount ({item.discountPercentage}%): -
+                          {formatPrice(
+                            item.discountAmount * item.quantity
+                          )}
+                        </p>
+                      </div>
+                    )}
 
                     {item.movie && (
                       <p className="mt-2 text-xs text-blue-300/70">

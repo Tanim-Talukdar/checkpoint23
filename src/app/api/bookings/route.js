@@ -18,7 +18,7 @@ const OPEN_TIME = 11 * 60;
 
 const CLOSE_TIME = 23 * 60;
 
-// CHANGED: Payment/booking expiry is now 10 minutes.
+// Payment/booking expiry is 10 minutes.
 const BOOKING_EXPIRY_MINUTES = 10;
 
 const MAX_ITEMS = 20;
@@ -26,6 +26,13 @@ const MAX_ITEMS = 20;
 const ACTIVE_BOOKING_STATUSES = ["pending", "confirmed"];
 
 const TIME_SLICE_MINUTES = 30;
+
+// Playground off-peak discount configuration.
+const PLAYGROUND_OFF_PEAK_DISCOUNT_PERCENTAGE = 30;
+
+const PLAYGROUND_OFF_PEAK_START_TIME = 11 * 60;
+
+const PLAYGROUND_OFF_PEAK_END_TIME = 16 * 60;
 
 const FIXED_MOVIE_SESSIONS = [
   {
@@ -370,14 +377,10 @@ function getScheduleForBooking(
       }
 
       const scheduleStart =
-        timeToMinutes(
-          schedule.startTime
-        );
+        timeToMinutes(schedule.startTime);
 
       const scheduleEnd =
-        timeToMinutes(
-          schedule.endTime
-        );
+        timeToMinutes(schedule.endTime);
 
       if (
         scheduleStart === null ||
@@ -404,20 +407,12 @@ function getScheduleForBooking(
         return false;
       }
 
-      /*
-       * Start time must respect the schedule's slot interval.
-       */
-
       const offset =
         startMinutes - scheduleStart;
 
       if (offset % slotDuration !== 0) {
         return false;
       }
-
-      /*
-       * Service duration itself must be valid.
-       */
 
       if (
         endMinutes - startMinutes !==
@@ -456,6 +451,70 @@ function isPlaygroundActivity(service) {
   return PLAYGROUND_ACTIVITY_SLUGS.has(
     service.slug
   );
+}
+
+/*
+ * Server-authoritative Playground off-peak pricing.
+ *
+ * Discount applies only to Playground activities starting
+ * at or after 11:00 and strictly before 16:00.
+ *
+ * The regular price always comes from MongoDB.
+ * The client cannot choose the discount or final price.
+ */
+function calculateBookingPrice({
+  facility,
+  service,
+  startTime,
+}) {
+  const regularPrice = Number(service.price);
+
+  if (
+    !Number.isFinite(regularPrice) ||
+    regularPrice < 0
+  ) {
+    return {
+      error: `Invalid price configured for ${service.name}.`,
+    };
+  }
+
+  const startMinutes = timeToMinutes(startTime);
+
+  const eligibleForOffPeakDiscount =
+    isPlaygroundFacility(facility) &&
+    isPlaygroundActivity(service) &&
+    startMinutes !== null &&
+    startMinutes >= PLAYGROUND_OFF_PEAK_START_TIME &&
+    startMinutes < PLAYGROUND_OFF_PEAK_END_TIME;
+
+  if (!eligibleForOffPeakDiscount) {
+    return {
+      regularPrice,
+      priceAtBooking: regularPrice,
+      discountAmount: 0,
+      discountPercentage: 0,
+    };
+  }
+
+  const discountAmount =
+    Math.round(
+      (regularPrice *
+        PLAYGROUND_OFF_PEAK_DISCOUNT_PERCENTAGE) /
+        100
+    );
+
+  const priceAtBooking = Math.max(
+    0,
+    regularPrice - discountAmount
+  );
+
+  return {
+    regularPrice,
+    priceAtBooking,
+    discountAmount,
+    discountPercentage:
+      PLAYGROUND_OFF_PEAK_DISCOUNT_PERCENTAGE,
+  };
 }
 
 function isExclusiveService(service) {
@@ -513,10 +572,6 @@ function getRequiredCapacityUnits(
   service,
   quantity
 ) {
-  /*
-   * Playground activities are a single physical resource.
-   */
-
   if (isExclusiveService(service)) {
     return [0];
   }
@@ -527,11 +582,6 @@ function getRequiredCapacityUnits(
   ) {
     return [0];
   }
-
-  /*
-   * Normal per-person / per-ticket services claim one
-   * physical capacity unit per person/ticket.
-   */
 
   return Array.from(
     { length: quantity },
@@ -602,15 +652,6 @@ async function removeExpiredLocks() {
   });
 }
 
-/*
- * CHANGED:
- *
- * Expired pending bookings are cancelled here.
- *
- * MongoDB TTL can remove expired locks, but TTL cannot
- * change Booking.status/paymentStatus. Therefore we explicitly
- * cancel expired pending bookings whenever this API is used.
- */
 async function cancelExpiredBookings() {
   const now = new Date();
 
@@ -719,11 +760,6 @@ async function createLocksAtomically({
     };
   }
 
-  /*
-   * The unique compound index on BookingLock is the actual
-   * concurrency guard.
-   */
-
   try {
     const locks =
       await BookingLock.insertMany(
@@ -738,11 +774,6 @@ async function createLocksAtomically({
       locks,
     };
   } catch (error) {
-    /*
-     * Clean up anything this request managed to create
-     * before hitting a duplicate key.
-     */
-
     await releaseBookingLocks(
       booking._id
     );
@@ -983,12 +1014,6 @@ export async function POST(
   try {
     await connectDB();
 
-    /*
-     * CHANGED:
-     *
-     * Clean both expired bookings and their locks before
-     * attempting a new reservation.
-     */
     await cleanupExpiredReservations();
 
     const body =
@@ -1092,10 +1117,6 @@ export async function POST(
       );
     }
 
-    /*
-     * Load all facilities in one DB operation.
-     */
-
     const facilityIds = [
       ...new Set(
         normalizedItems.map(
@@ -1128,23 +1149,14 @@ export async function POST(
 
     const preparedBookings = [];
 
-    // CHANGED: This expiry is now 10 minutes.
     const expiryDate =
       getExpiryDate();
-
-    /*
-     * Shared payment group.
-     */
 
     bookingGroupReference =
       createBookingGroupReference();
 
     const paymentTransactionId =
       createPaymentTransactionId();
-
-    /*
-     * Validate every cart item entirely from MongoDB.
-     */
 
     for (
       let index = 0;
@@ -1240,9 +1252,10 @@ export async function POST(
 
       /*
        * Membership:
-       *
        * No time-slot selection.
        * One entry for the whole operating day.
+       *
+       * Membership pricing remains unchanged.
        */
 
       if (
@@ -1296,6 +1309,18 @@ export async function POST(
             item.date
           );
 
+        const membershipPrice =
+          Number(service.price);
+
+        if (
+          !Number.isFinite(membershipPrice) ||
+          membershipPrice < 0
+        ) {
+          return jsonError(
+            `Invalid price configured for ${service.name}.`
+          );
+        }
+
         preparedBookings.push({
           facility,
           service,
@@ -1305,13 +1330,9 @@ export async function POST(
           endTime,
           durationMinutes,
           priceAtBooking:
-            Number(
-              service.price
-            ),
+            membershipPrice,
           totalAmount:
-            Number(
-              service.price
-            ) * quantity,
+            membershipPrice * quantity,
           bookingGroupReference,
           paymentTransactionId,
           expiresAt:
@@ -1384,10 +1405,6 @@ export async function POST(
             `Invalid duration configured for ${service.name}.`
           );
         }
-
-        /*
-         * Server calculates endTime.
-         */
 
         const calculatedEndTime =
           addMinutes(
@@ -1635,25 +1652,35 @@ export async function POST(
         }
       }
 
-      const priceAtBooking =
-        Number(
-          service.price
-        );
+      /*
+       * SERVER-SIDE PRICE CALCULATION
+       *
+       * The regular price is read from MongoDB.
+       * Only eligible Playground activities receive
+       * the 30% off-peak discount.
+       *
+       * priceAtBooking stores the final unit price.
+       * totalAmount stores the final amount for quantity.
+       */
 
-      if (
-        !Number.isFinite(
-          priceAtBooking
-        ) ||
-        priceAtBooking < 0
-      ) {
+      const priceDetails =
+        calculateBookingPrice({
+          facility,
+          service,
+          startTime,
+        });
+
+      if (priceDetails.error) {
         return jsonError(
-          `Invalid price configured for ${service.name}.`
+          priceDetails.error
         );
       }
 
+      const priceAtBooking =
+        priceDetails.priceAtBooking;
+
       const totalAmount =
-        priceAtBooking *
-        quantity;
+        priceAtBooking * quantity;
 
       if (
         !Number.isFinite(

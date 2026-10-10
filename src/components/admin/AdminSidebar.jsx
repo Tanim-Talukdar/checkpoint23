@@ -4,14 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   FiGrid,
-  FiFilm,
-  FiMonitor,
   FiClock,
   FiUsers,
   FiCreditCard,
   FiMenu,
   FiX,
-  FiLogOut,
   FiLayers,
   FiUserCheck,
 } from "react-icons/fi";
@@ -24,22 +21,22 @@ const navigation = [
     icon: FiGrid,
   },
   {
-    name: "Facalites",
+    name: "Facilities",
     href: "/admin/facalites",
     icon: FiLayers,
+    mainOnly: true,
   },
-
   {
     name: "Booking Slot",
     href: "/admin/booking-slots",
     icon: FiClock,
+    mainOnly: true,
   },
   {
     name: "Bookings",
     href: "/admin/bookings",
     icon: FiUsers,
   },
-  
   {
     name: "Membership",
     href: "/admin/membership",
@@ -52,22 +49,23 @@ const navigation = [
   },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ adminLevel = "moderator" }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  const visibleNavigation = navigation.filter(
+    (item) => !item.mainOnly || adminLevel === "main"
+  );
+
   return (
     <>
-      {/* Mobile button */}
-
       <button
         onClick={() => setOpen(true)}
+        aria-label="Open navigation"
         className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#07101c]/90 text-white backdrop-blur-xl lg:hidden"
       >
         <FiMenu size={20} />
       </button>
-
-      {/* Mobile overlay */}
 
       {open && (
         <div
@@ -76,17 +74,11 @@ export default function AdminSidebar() {
         />
       )}
 
-      {/* Sidebar */}
-
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-white/[0.07] bg-[#07101c] transition-transform duration-300 lg:translate-x-0 ${
-          open
-            ? "translate-x-0"
-            : "-translate-x-full"
+          open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo */}
-
         <div className="flex h-20 items-center justify-between border-b border-white/[0.07] px-6">
           <Link
             href="/admin"
@@ -96,28 +88,26 @@ export default function AdminSidebar() {
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-500">
               The Checkpoint
             </p>
-
-            <h1 className="mt-1 text-lg font-black tracking-tight">
+            <h1 className="mt-1 text-lg font-black tracking-tight text-white">
               ADMIN PANEL
             </h1>
           </Link>
 
           <button
             onClick={() => setOpen(false)}
+            aria-label="Close navigation"
             className="text-slate-500 hover:text-white lg:hidden"
           >
             <FiX size={20} />
           </button>
         </div>
 
-        {/* Navigation */}
-
         <nav className="flex-1 space-y-1 px-3 py-6">
           <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600">
             Management
           </p>
 
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
 
             const active =
@@ -155,20 +145,15 @@ export default function AdminSidebar() {
           })}
         </nav>
 
-        {/* Bottom */}
-
         <div className="border-t border-white/[0.07] p-4">
           <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
             <p className="text-xs font-semibold text-white">
-              Administrator
+              {adminLevel === "main" ? "Main Administrator" : "Moderator"}
             </p>
-
             <p className="mt-1 text-[11px] text-slate-600">
               The Checkpoint Cinema
             </p>
           </div>
-
-
         </div>
       </aside>
     </>

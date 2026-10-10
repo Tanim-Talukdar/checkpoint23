@@ -13,9 +13,13 @@ export function createAdminToken(admin) {
     {
       adminId: admin._id.toString(),
       role: admin.role,
+      adminLevel: admin.adminLevel,
     },
     secret,
-    { expiresIn: "1d" }
+    {
+      expiresIn: "1d",
+      algorithm: "HS256",
+    }
   );
 }
 
@@ -25,7 +29,9 @@ export function verifyAdminToken(token) {
   if (!secret || !token) return null;
 
   try {
-    return jwt.verify(token, secret);
+    return jwt.verify(token, secret, {
+      algorithms: ["HS256"],
+    });
   } catch {
     return null;
   }

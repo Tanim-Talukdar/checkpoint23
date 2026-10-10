@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 
-const NOT_FOUND = "/page-does-not-exist";
+const NOT_FOUND = "/404";
+
+const MODERATOR_RESTRICTED_PATHS = [
+  "/admin/facalites",
+  "/admin/booking-slots",
+];
+
+function isRestrictedForModerator(pathname) {
+  return MODERATOR_RESTRICTED_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+}
 
 export function proxy(request) {
   const token = request.cookies.get("admin_session")?.value;
-  const admin = token && verifyAdminToken(token);
+  const admin = token ? verifyAdminToken(token) : null;
 
-  if (!admin || admin.role !== "admin" || !admin.adminId) {
+  if (!admin?.adminId || admin.role !== "admin") {
     const response = NextResponse.rewrite(
       new URL(NOT_FOUND, request.url)
     );
@@ -17,7 +28,18 @@ export function proxy(request) {
     return response;
   }
 
-  return NextResponse.next();
+  if (admin.adminLevel === "main") {
+    return NextResponse.next();
+  }
+
+  if (
+    admin.adminLevel === "moderator" &&
+    !isRestrictedForModerator(request.nextUrl.pathname)
+  ) {
+    return NextResponse.next();
+  }
+
+  return NextResponse.rewrite(new URL(NOT_FOUND, request.url));
 }
 
 export const config = {

@@ -36,7 +36,7 @@ export async function POST(request) {
 
     const admin = await Admin.findOne({
       email: email.toLowerCase(),
-    }).select("_id name email role passwordHash isActive");
+    }).select("_id name email role passwordHash isActive adminLevel");
 
     if (!admin?.isActive) {
       return NextResponse.json(
